@@ -15,10 +15,19 @@
     "noImplicitAny": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
 
     "typeRoots": ["./node_modules/@types", "./node_modules/@microsoft"],
     "types": ["webpack-env"],
-    "lib": ["es5", "dom", "es2015.collection", "es2015.promise", "es2015"]
+    "lib": [
+      "es5",
+      "dom",
+      "es2015.collection",
+      "es2015.promise",
+      "es2015",
+      "es2017"
+    ]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

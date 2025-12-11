@@ -1,47 +1,117 @@
 import * as React from "react";
+import { ChevronRight20Filled, Star20Filled } from "@fluentui/react-icons";
 
 interface ISectorCardProps {
   title: string;
-  description: string;
+  description?: string;
   onClick: () => void;
+  onStarClick?: () => void;
 }
 
 const SectorCard: React.FC<ISectorCardProps> = ({
   title,
   description,
   onClick,
+  onStarClick,
 }) => {
   return (
     <div
       style={{
-        border: "1px solid #ccc",
-        borderRadius: 8,
-        padding: 16,
-        width: 200,
-        cursor: "pointer",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-        transition: "transform 0.1s",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        width: 320,
+        height: 200,
+        border: "1px solid #A3A3A3",
+        borderRadius: 5,
+        background: "#FFF",
+        overflow: "hidden",
       }}
-      onClick={onClick}
-      onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      <h3 style={{ margin: "0 0 8px 0", fontSize: 16 }}>{title}</h3>
-      <p style={{ margin: 0, fontSize: 14, color: "#555" }}>{description}</p>
-      <button
+      {/* HEADER FIXO */}
+      <div
         style={{
-          marginTop: 12,
-          padding: "6px 12px",
-          fontSize: 14,
-          borderRadius: 4,
-          border: "none",
-          backgroundColor: "#0078d4",
-          color: "#fff",
-          cursor: "pointer",
+          background: "#F2F2F2",
+          width: "100%",
+          height: 60,
+          padding: "10px 5px",
+          borderBottom: "1px solid #A3A3A3",
+          display: "flex",
+          alignItems: "center",
         }}
       >
-        Ver mais
-      </button>
+        <h3
+          style={{
+            margin: 0,
+            fontWeight: 600,
+            color: "#4A4A4A",
+            textTransform: "uppercase",
+            wordBreak: "break-word",
+            fontSize: "clamp(10px, 2.6vw, 14px)",
+            lineHeight: "1.2",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitBoxOrient: "vertical",
+            WebkitLineClamp: 3,
+          }}
+        >
+          {title}
+        </h3>
+      </div>
+
+      {/* BOTTOM SECTION */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column", // 👉 agora em coluna
+          padding: "10px 20px",
+          background: "#FFFFFF",
+          fontSize: 14,
+          color: "#333",
+          position: "relative",
+        }}
+      >
+        {/* Descrição (TOPO ESQUERDA) */}
+        <span
+          style={{
+            fontWeight: 500,
+            alignSelf: "flex-start",
+          }}
+        >
+          {description || "SEM DESCRICAO"}
+        </span>
+
+        {/* Chevron (DIREITA, CENTRALIZADO VERTICALMENTE) */}
+        <div
+          onClick={onClick}
+          style={{
+            position: "absolute",
+            right: 20,
+            top: "50%",
+            transform: "translateY(-50%)",
+            cursor: "pointer",
+          }}
+        >
+          <ChevronRight20Filled style={{ color: "#333" }} />
+        </div>
+
+        {/* Estrela (INFERIOR DIREITA) */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            onStarClick?.();
+          }}
+          style={{
+            position: "absolute",
+            bottom: 10,
+            right: 12,
+            cursor: "pointer",
+          }}
+        >
+          <Star20Filled style={{ color: "#f4b400" }} />
+        </div>
+      </div>
     </div>
   );
 };
