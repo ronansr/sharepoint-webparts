@@ -11,6 +11,7 @@ export interface BaseDados {
 
   kpis?: string[]; // KPIs (ex: ["FCO 006.A", "FCO 006.B"])
   status?: boolean; // Status (True / False)
+  esconderNoMenu?: boolean; // Status (True / False)
 
   extradata?: string; // Campo extra (se existir)
   link?: string; // Link (se existir)

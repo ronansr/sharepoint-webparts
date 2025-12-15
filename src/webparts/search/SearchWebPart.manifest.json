@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "e8f0a3a2-1234-4d56-89ab-abcdef123455",
+  "alias": "SearchWebPart",
+  "componentType": "WebPart",
+  "version": "1.0.0",
+  "manifestVersion": 2,
+  "supportsFullBleed": true,
+  "preconfiguredEntries": [
+    {
+      "groupId": "e1e8b4a1-3f64-4bca-9c85-6a4a1f4d7d15",
+      "group": { "default": "Outros" },
+      "title": { "default": "Pesquisa" },
+      "description": {
+        "default": "Pesquisa global para filtrar diretrizes, temas, categorias e KPIs"
+      },
+      "officeFabricIconFontName": "Search",
+      "properties": {}
+    }
+  ]
+}

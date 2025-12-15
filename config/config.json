@@ -17,6 +17,14 @@
           "manifest": "./src/webparts/kpiMenu/KpiMenuWebPart.manifest.json"
         }
       ]
+    },
+    "search-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/search/SearchWebPart.js",
+          "manifest": "./src/webparts/search/SearchWebPart.manifest.json"
+        }
+      ]
     }
   },
   "externals": {},

@@ -15,7 +15,7 @@ import {
 import MultiLevelMenu, { IGenericNode } from "./MultiLeveMenu";
 import { PowerBIService } from "../../../services/PowerBIService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { extractReportId } from "../../../utils";
+import { extractReportId, filterHierarchy } from "../../../utils";
 import { TabList, Tab } from "@fluentui/react-components";
 
 export interface IDashboardProps {
@@ -25,28 +25,7 @@ export interface IDashboardProps {
 }
 
 // Tipos
-interface IKpi {
-  id: string;
-  title: string;
-  [key: string]: any;
-}
-interface ICategoria {
-  id: string;
-  title: string;
-  kpis: IKpi[];
-}
-interface ITema {
-  id: string;
-  title: string;
-  descricao?: string;
-  categorias: ICategoria[];
-}
-interface IDiretriz {
-  id: string;
-  title: string;
-  descricao?: string;
-  temas: ITema[];
-}
+
 interface BaseDados {
   Id: number;
   Title: string;
@@ -87,6 +66,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
     "diretrizes"
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
   const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
@@ -125,6 +105,19 @@ const Dashboard: React.FC<IDashboardProps> = ({
     //   setIsFullscreen(false);
     // }
   }, [activeTab]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ text: string }>;
+      setSearchText(custom.detail.text);
+    };
+
+    window.addEventListener("dashboard-search", handler);
+
+    return () => {
+      window.removeEventListener("dashboard-search", handler);
+    };
+  }, []);
 
   // ------------------------------
   // Buscar BaseDados
@@ -392,7 +385,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
         if (item.categoria) {
           let categoria = tema.categorias.find((c) => c.id === item.categoria);
           if (!categoria) {
-            categoria = { id: item.categoria, title: item.Title, kpis: [] };
+            categoria = {
+              id: item.categoria,
+              title: item.Title,
+              kpis: [],
+              link: item.link,
+            };
             tema.categorias.push(categoria);
           }
 
@@ -727,9 +725,23 @@ const Dashboard: React.FC<IDashboardProps> = ({
               background: "#fff",
             }}
           >
-            {!selectedItemLink && (
+            {/* Nenhum item selecionado */}
+            {!selectedKpiData && (
               <div style={{ color: "#666" }}>
                 Selecione um item no menu ao lado.
+              </div>
+            )}
+
+            {/* Item selecionado SEM link */}
+            {selectedKpiData && !selectedKpiData?.link?.Url && (
+              <div
+                style={{
+                  color: "#999",
+                  fontSize: 16,
+                  fontWeight: 500,
+                }}
+              >
+                Sem link do Relatório
               </div>
             )}
           </div>
@@ -877,9 +889,137 @@ const Dashboard: React.FC<IDashboardProps> = ({
       </div>
     );
   };
+  const renderEmptyContent = () => {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: 300,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          background: "#fff",
+          borderRadius: 8,
+          border: "1px dashed #ccd",
+          color: "#555",
+        }}
+      >
+        <span style={{ fontSize: 16, fontWeight: 500 }}>
+          Nenhuma informação encontrada.
+        </span>
+      </div>
+    );
+  };
+  const renderSearch = (data: IDiretriz[]) => {
+    if (!data || data.length === 0) {
+      return renderEmptyContent();
+    }
+    const menuData = convertHierarchyListToMenuTree(data);
+    return (
+      <div style={{ display: "flex", width: "100%", gap: 5 }}>
+        <MultiLevelMenu
+          data={menuData}
+          onSelect={(item) => {
+            setSelectedItemLink(item.link || item.id);
+            setSelectedSector(item.id);
+            setSelectedKpiData(item.data || null);
+            if (item.data?.link?.Url)
+              powerBIService.embedReport(
+                context,
+                item.data.link.Url,
+                extractReportId(item.data.link.Url) ?? ""
+              );
+          }}
+          menuVisible={menuVisible}
+          onToggleMenu={setMenuVisible}
+          // hideSearch
+        />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {selectedKpiData && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                background: "#f0f0f0",
+                borderRadius: 5,
+                fontWeight: 600,
+                fontSize: 16,
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Navigation20Regular
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setMenuVisible(!menuVisible)}
+                />
+                <span>{selectedKpiData.title}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* Botão Tela Cheia */}
+                <div
+                  onClick={handleToggleFullscreen}
+                  title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                  style={{
+                    cursor: "pointer",
+                    padding: 4,
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {isFullscreen ? (
+                    <ArrowExpand20Regular />
+                  ) : (
+                    <ArrowExpand20Regular />
+                  )}
+                </div>
+
+                {/* Favorito */}
+                <Star20Filled
+                  style={{
+                    color: isFavoritedItem ? "#f4b400" : "grey",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onClickFavorite(selectedKpiData)}
+                />
+              </div>
+              {/* <Star20Filled
+                style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
+                onClick={() => onClickFavorite(selectedKpiData)}
+              /> */}
+            </div>
+          )}
+          <div
+            id="reportContainer"
+            style={{
+              flex: 1,
+              minHeight: 400,
+              padding: 5,
+              border: "1px solid #ccd",
+              borderRadius: 8,
+              background: "#fff",
+            }}
+          >
+            {!selectedItemLink && (
+              <div style={{ color: "#666" }}>
+                Selecione um item no menu ao lado.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const getContent = () => {
     const data = activeTab === "diretrizes" ? hierarchy : favoriteHierarchy;
+
+    if (searchText) return renderSearch(filterHierarchy(hierarchy, searchText));
 
     // Renderização de FAVORITOS - Exibe menu multinível direto
     if (activeTab === "favoritos") {
@@ -892,24 +1032,46 @@ const Dashboard: React.FC<IDashboardProps> = ({
     return renderCategorias(data);
   };
 
+  const isSearching = !!searchText && searchText.trim().length > 0;
   // ------------------------------
   // Render Principal
   // ------------------------------
   return (
     <div>
-      <TabList
-        selectedValue={activeTab}
-        onTabSelect={(e, data) =>
-          setActiveTab(data.value as "diretrizes" | "favoritos")
-        }
-        style={{
-          marginBottom: 10,
-        }}
-      >
-        <Tab value="diretrizes">Diretrizes</Tab>
-        <Tab value="favoritos">Favoritos</Tab>
-      </TabList>
-      {activeTab === "diretrizes" && renderBreadcrumb()}
+      {/* 🔍 Modo Pesquisa */}
+      {isSearching ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            background: "#f0f0f0",
+            borderRadius: 8,
+            fontSize: 16,
+            fontWeight: 600,
+            color: "#333",
+          }}
+        >
+          Resultado da pesquisa "{searchText}"
+        </div>
+      ) : (
+        <>
+          {/* 🧭 Tabs normais */}
+          <TabList
+            selectedValue={activeTab}
+            onTabSelect={(e, data) =>
+              setActiveTab(data.value as "diretrizes" | "favoritos")
+            }
+            style={{ marginBottom: 10 }}
+          >
+            <Tab value="diretrizes">Diretrizes</Tab>
+            <Tab value="favoritos">Favoritos</Tab>
+          </TabList>
+
+          {/* 🧱 Breadcrumb só fora da busca */}
+          {activeTab === "diretrizes" && renderBreadcrumb()}
+        </>
+      )}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         {getContent()}
       </div>
