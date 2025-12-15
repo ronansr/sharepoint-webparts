@@ -50,25 +50,58 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
     );
   };
 
+  const normalizeText = (value?: string) =>
+    (value ?? "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
   const filterTree = (nodes: IGenericNode[], q: string): IGenericNode[] => {
     if (!q.trim()) return nodes;
-    return nodes
-      .map((node) => {
-        const match =
-          node.title.toLowerCase().includes(q.toLowerCase()) ||
-          node.children?.some((c) =>
-            c.title.toLowerCase().includes(q.toLowerCase())
-          );
-        if (match) {
-          return {
-            ...node,
-            children: node.children ? filterTree(node.children, q) : [],
-          };
-        }
-        return null;
-      })
-      .filter(Boolean) as IGenericNode[];
+
+    const query = normalizeText(q);
+    const result: IGenericNode[] = [];
+
+    for (const node of nodes) {
+      const filteredChildren = node.children
+        ? filterTree(node.children, q)
+        : [];
+
+      const titleMatch = normalizeText(node.title).includes(query);
+      const dataTitleMatch = normalizeText(node.data?.Title).includes(query);
+      const childMatch = filteredChildren.length > 0;
+
+      if (titleMatch || dataTitleMatch || childMatch) {
+        result.push({
+          ...node,
+          children: filteredChildren,
+          showChildren: true, // expande automaticamente
+        });
+      }
+    }
+
+    return result;
   };
+
+  //   const filterTree = (nodes: IGenericNode[], q: string): IGenericNode[] => {
+  //     if (!q.trim()) return nodes;
+  //     return nodes
+  //       .map((node) => {
+  //         const match =
+  //           node.title.toLowerCase().includes(q.toLowerCase()) ||
+  //           node.children?.some((c) =>
+  //             c.title.toLowerCase().includes(q.toLowerCase())
+  //           );
+  //         if (match) {
+  //           return {
+  //             ...node,
+  //             children: node.children ? filterTree(node.children, q) : [],
+  //           };
+  //         }
+  //         return null;
+  //       })
+  //       .filter(Boolean) as IGenericNode[];
+  //   };
 
   const filteredData = useMemo(() => filterTree(data, search), [data, search]);
 
