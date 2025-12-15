@@ -205,4 +205,18 @@ export class PowerBIService {
     this.isResizing = false; // Reset da flag
     await this.forceResize();
   }
+
+  public clearReport(containerId: string = "reportContainer") {
+    const container = document.getElementById(containerId);
+
+    if (!container) return;
+
+    console.log("🧹 Limpando reportContainer");
+
+    // Remove embed do Power BI
+    this.powerbi.reset(container);
+
+    // Limpa DOM (remove iframe residual)
+    container.innerHTML = "";
+  }
 }

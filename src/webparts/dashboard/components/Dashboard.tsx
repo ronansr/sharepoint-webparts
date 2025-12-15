@@ -110,6 +110,22 @@ const Dashboard: React.FC<IDashboardProps> = ({
       isFavorited(selectedKpiData?.id).then((resp) => setFavoritedItem(resp));
   }, [selectedKpiData]);
 
+  useEffect(() => {
+    // 🔄 Resetar seleção ao trocar de aba
+    setSelectedKpiData(null);
+    setSelectedItemLink(null);
+    setSelectedDiretriz(null);
+    setSelectedTema(null);
+    setMenuVisible(true);
+    // powerBIService.clearReport();
+
+    // // Opcional: sair do fullscreen se estiver ativo
+    // if (isFullscreen) {
+    //   powerBIService.toggleFullscreen(true);
+    //   setIsFullscreen(false);
+    // }
+  }, [activeTab]);
+
   // ------------------------------
   // Buscar BaseDados
   // ------------------------------
@@ -722,6 +738,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
     );
   };
   const renderFavorites = (data: IDiretriz[]) => {
+    if (!data || data.length === 0) {
+      return renderEmptyFavorites();
+    }
     const menuData = convertHierarchyListToMenuTree(data);
     return (
       <div style={{ display: "flex", width: "100%", gap: 5 }}>
@@ -816,6 +835,45 @@ const Dashboard: React.FC<IDashboardProps> = ({
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+  const renderEmptyFavorites = () => {
+    return (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: 300,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          background: "#fff",
+          borderRadius: 8,
+          border: "1px dashed #ccd",
+          color: "#555",
+        }}
+      >
+        <span style={{ fontSize: 16, fontWeight: 500 }}>
+          Você ainda não tem favoritos salvos.
+        </span>
+
+        <button
+          onClick={() => setActiveTab("diretrizes")}
+          style={{
+            padding: "8px 16px",
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            fontWeight: 600,
+            background: "#0078d4",
+            color: "#fff",
+          }}
+        >
+          Ver diretrizes
+        </button>
       </div>
     );
   };
