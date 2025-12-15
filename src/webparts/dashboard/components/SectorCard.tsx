@@ -1,11 +1,20 @@
 import * as React from "react";
 import { ChevronRight20Filled, Star20Filled } from "@fluentui/react-icons";
-
+import { WebPartContext } from "@microsoft/sp-webpart-base";
+import { UsuarioListaItem } from "./Dashboard";
+import { SPFI, spfi } from "@pnp/sp";
+import { SPBrowser } from "@pnp/sp";
+import "@pnp/sp/webs";
+import "@pnp/sp/lists";
+import "@pnp/sp/items";
 interface ISectorCardProps {
   title: string;
   description?: string;
   onClick: () => void;
   onStarClick?: () => void;
+  context: WebPartContext;
+  siteUrl: string;
+  id: any;
 }
 
 const SectorCard: React.FC<ISectorCardProps> = ({
@@ -13,7 +22,36 @@ const SectorCard: React.FC<ISectorCardProps> = ({
   description,
   onClick,
   onStarClick,
+  context,
+  siteUrl,
+  id,
 }) => {
+  const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
+  const [isFav, setIsFav] = React.useState(false);
+
+  const isFavorited = async (itemId: string): Promise<boolean> => {
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+
+      const result: UsuarioListaItem[] = await sp.web.lists
+        .getByTitle("UsuarioListas")
+        .items.select("Id", "idItem", "idGrupo", "email")
+        .filter(
+          `email eq '${currentUserEmail}' and idGrupo eq 1 and idItem eq '${itemId}'`
+        )();
+      if (result.length > 0) setIsFav(true);
+      else setIsFav(false);
+      return result.length > 0;
+    } catch (err) {
+      console.error("Erro ao verificar favoritos:", err);
+      return false;
+    }
+  };
+
+  React.useEffect(() => {
+    isFavorited(id);
+  }, []);
+
   return (
     <div
       style={{
@@ -101,6 +139,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
           onClick={(e) => {
             e.stopPropagation();
             onStarClick?.();
+            setIsFav((prev) => !prev);
           }}
           style={{
             position: "absolute",
@@ -109,7 +148,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
             cursor: "pointer",
           }}
         >
-          <Star20Filled style={{ color: "#f4b400" }} />
+          <Star20Filled style={{ color: isFav ? "#f4b400" : "gray" }} />
         </div>
       </div>
     </div>
