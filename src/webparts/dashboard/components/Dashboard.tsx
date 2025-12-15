@@ -49,11 +49,13 @@ interface IDiretriz {
 interface BaseDados {
   Id: number;
   Title: string;
+  id0?: string;
   diretriz?: string;
   tema?: string;
   categoria?: string;
   descricao?: string;
   kpis?: any[];
+  kpisId?: any[];
   [key: string]: any;
 }
 export interface UsuarioListaItem {
@@ -79,6 +81,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [selectedItemLink, setSelectedItemLink] = useState<string | null>(null);
   const [selectedKpiData, setSelectedKpiData] = useState<IKpi | null>(null);
   const [menuVisible, setMenuVisible] = useState(true);
+  const [isFavoritedItem, setFavoritedItem] = useState(false);
   const [activeTab, setActiveTab] = useState<"diretrizes" | "favoritos">(
     "diretrizes"
   );
@@ -89,9 +92,15 @@ const Dashboard: React.FC<IDashboardProps> = ({
   useEffect(() => {
     loadBaseDados();
   }, []);
+
   useEffect(() => {
     if (activeTab === "favoritos") loadFavoritos();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedKpiData)
+      isFavorited(selectedKpiData?.id).then((resp) => setFavoritedItem(resp));
+  }, [selectedKpiData]);
 
   // ------------------------------
   // Buscar BaseDados
@@ -108,155 +117,224 @@ const Dashboard: React.FC<IDashboardProps> = ({
     }
   };
 
-  /**
-   * Reconstrói uma hierarquia completa (Diretriz > Tema > Categoria > KPI)
-   * a partir de QUALQUER item do BaseDados (diretriz, tema, categoria ou kpi).
-   */
-  const buildFullHierarchyFromBaseItem = (
-    baseItem: BaseDados,
-    baseDados: BaseDados[]
-  ): IDiretriz | null => {
-    // 1 — Encontrar a diretriz
-    const dirData = baseDados.find(
-      (d) => d.id0.toString() === baseItem.diretriz
-    );
-    if (!dirData) return null;
-
-    const diretriz: IDiretriz = {
-      id: dirData.id0.toString(),
-      title: dirData.Title,
-      descricao: dirData.descricao,
-      temas: [],
-    };
-
-    // 2 — Se o item já contém o tema → carregar
-    if (baseItem.tema) {
-      const temaData = baseDados.find(
-        (t) => t.id0.toString() === baseItem.tema
-      );
-      if (!temaData) return diretriz;
-
-      const tema: ITema = {
-        id: temaData.id0.toString(),
-        title: temaData.Title,
-        descricao: temaData.descricao,
-        categorias: [],
-      };
-      diretriz.temas.push(tema);
-
-      // 3 — Categoria
-      if (baseItem.categoria) {
-        const catData = baseDados.find(
-          (c) => c.id0.toString() === baseItem.categoria
-        );
-        if (!catData) return diretriz;
-
-        const categoria: ICategoria = {
-          id: catData.id0.toString(),
-          title: catData.Title,
-          kpis: [],
-        };
-        tema.categorias.push(categoria);
-
-        // 4 — KPIs
-        if (baseItem.kpis?.length) {
-          baseItem.kpis.forEach((kpiId) => {
-            const kpiData = baseDados.find((k) => k.Id.toString() === kpiId);
-            if (kpiData) {
-              categoria.kpis.push({
-                id: kpiData.Id.toString(),
-                title: kpiData.Title,
-                ...kpiData,
-              });
-            }
-          });
-        }
-      }
-    }
-
-    return diretriz;
-  };
-
   // ------------------------------
-  // Carregar Favoritos
+  // Carregar Favoritos - CORRIGIDO
   // ------------------------------
   const loadFavoritos = async () => {
     try {
       const currentUserEmail = context.pageContext.user.email;
 
+      // 1. Buscar favoritos do usuário
       const favoritesRaw: UsuarioListaItem[] = await sp.web.lists
         .getByTitle("UsuarioListas")
         .items();
 
       const favorites = favoritesRaw.filter(
-        (fav) => fav.email === currentUserEmail
+        (fav) => fav.email === currentUserEmail && fav.idGrupo === 1
       );
 
+      if (favorites.length === 0) {
+        setFavoriteHierarchy([]);
+        return;
+      }
+
+      const hierarchyFav = getFavoritesOnly(hierarchy, favorites);
+
+      console.log(hierarchyFav);
+
+      setFavoriteHierarchy(hierarchyFav);
+
+      return;
+
+      // 2. Buscar todos os itens da BaseDados
       const baseDados: BaseDados[] = await sp.web.lists
         .getByTitle("BaseDados")
         .items();
 
+      // 3. Criar mapa para acesso rápido
+      const itemMap: { [key: string]: BaseDados } = {};
+      baseDados.forEach((item) => {
+        if (item.id0) {
+          itemMap[item.id0] = item;
+        }
+      });
+
+      // 4. Estrutura para armazenar hierarquia de favoritos
       const structuredMap: { [key: string]: IDiretriz } = {};
 
+      // 5. Para cada favorito, reconstruir a hierarquia completa
       favorites.forEach((fav) => {
-        const baseItem = baseDados.find((d) => d.id0.toString() === fav.idItem);
-        if (!baseItem) return;
+        const favItem = itemMap[fav.idItem || ""];
+        if (!favItem) return;
 
-        const fullTree = buildFullHierarchyFromBaseItem(baseItem, baseDados);
-        if (!fullTree) return;
+        // Determinar o tipo do item favorito
+        const isDiretriz = favItem.diretriz && !favItem.tema;
+        const isTema = favItem.diretriz && favItem.tema && !favItem.categoria;
+        const isCategoria =
+          favItem.diretriz &&
+          favItem.tema &&
+          favItem.categoria &&
+          !favItem.kpisId;
+        const isKpi = favItem.categoria && favItem.kpisId;
 
-        // Criar Diretriz caso não exista
-        if (!structuredMap[fullTree.id]) {
-          structuredMap[fullTree.id] = {
-            id: fullTree.id,
-            title: fullTree.title,
+        // Buscar a Diretriz
+        const diretrizId = favItem.diretriz || favItem.id0;
+        const diretrizItem = itemMap[diretrizId || ""];
+        if (!diretrizItem) return;
+
+        // Criar/Obter Diretriz
+        if (!structuredMap[diretrizId || ""]) {
+          structuredMap[diretrizId || ""] = {
+            id: diretrizId || "",
+            title: diretrizItem.Title,
+            descricao: diretrizItem.descricao,
             temas: [],
           };
         }
+        const diretriz = structuredMap[diretrizId || ""];
 
-        const targetDir = structuredMap[fullTree.id];
+        // Se for apenas diretriz, já está ok
+        if (isDiretriz) return;
 
-        // Processar Temas
-        fullTree.temas.forEach((temaNode) => {
-          let tema = targetDir.temas.find((t) => t.id === temaNode.id);
-          if (!tema) {
-            tema = {
-              id: temaNode.id,
-              title: temaNode.title,
-              categorias: [],
-            };
-            targetDir.temas.push(tema);
-          }
+        // Buscar o Tema
+        const temaId = favItem.tema || (isTema ? favItem.id0 : null);
+        if (!temaId) return;
 
-          // Processar Categorias
-          temaNode.categorias.forEach((catNode) => {
-            let categoria = tema?.categorias?.find((c) => c.id === catNode.id);
-            if (!categoria) {
-              categoria = {
-                id: catNode.id,
-                title: catNode.title,
-                kpis: [],
-              };
-              tema?.categorias?.push(categoria);
+        const temaItem = itemMap[temaId];
+        if (!temaItem) return;
+
+        // Criar/Obter Tema
+        let tema = diretriz.temas.find((t) => t.id === temaId);
+        if (!tema) {
+          tema = {
+            id: temaId,
+            title: temaItem.Title,
+            descricao: temaItem.descricao,
+            categorias: [],
+          };
+          diretriz.temas.push(tema);
+        }
+
+        // Se for apenas tema, já está ok
+        if (isTema) return;
+
+        // Buscar a Categoria
+        const categoriaId =
+          favItem.categoria || (isCategoria ? favItem.id0 : null);
+        if (!categoriaId) return;
+
+        const categoriaItem = itemMap[categoriaId];
+        if (!categoriaItem) return;
+
+        // Criar/Obter Categoria
+        let categoria = tema.categorias.find((c) => c.id === categoriaId);
+        if (!categoria) {
+          categoria = {
+            id: categoriaId,
+            title: categoriaItem.Title,
+            kpis: [],
+          };
+          tema.categorias.push(categoria);
+        }
+
+        // Se for apenas categoria, já está ok
+        if (isCategoria) return;
+
+        // Buscar KPIs da categoria
+        if (categoriaItem.kpisId && categoriaItem.kpisId.length > 0) {
+          categoriaItem.kpisId.forEach((kpiId: any) => {
+            const kpiItem = baseDados.find((k) => k.Id === kpiId);
+            if (
+              kpiItem &&
+              !categoria?.kpis.find((k) => k.id === kpiId.toString())
+            ) {
+              categoria?.kpis.push({
+                id: kpiId.toString(),
+                title: kpiItem.Title,
+                ...kpiItem,
+              });
             }
-
-            // Processar KPIs
-            catNode.kpis.forEach((kpiNode) => {
-              if (!categoria?.kpis?.some((k) => k.id === kpiNode.id)) {
-                categoria?.kpis.push({
-                  id: kpiNode.id,
-                  title: kpiNode.title,
-                });
-              }
-            });
           });
-        });
+        }
       });
 
       setFavoriteHierarchy(Object.values(structuredMap));
+      console.log(
+        "Hierarquia de favoritos carregada:",
+        Object.values(structuredMap)
+      );
     } catch (error) {
       console.error("Erro ao carregar favoritos", error);
+      setFavoriteHierarchy([]);
     }
+  };
+
+  const getFavoritesOnly = (
+    hierarchy: IDiretriz[],
+    favorites: UsuarioListaItem[]
+  ): IDiretriz[] => {
+    const favoriteIds = new Set(favorites.map((f) => f.idItem));
+
+    return hierarchy
+      .map((diretriz) => {
+        // 1️⃣ Favorito é a DIRETRIZ
+        if (favoriteIds.has(diretriz.id)) {
+          return diretriz;
+        }
+
+        // 2️⃣ Filtrar TEMAS
+        const temasFiltrados = diretriz.temas
+          .map((tema) => {
+            // Tema favoritado
+            if (favoriteIds.has(tema.id)) {
+              return tema;
+            }
+
+            // 3️⃣ Filtrar CATEGORIAS
+            const categoriasFiltradas = tema.categorias
+              .map((categoria) => {
+                // Categoria favoritada
+                if (favoriteIds.has(categoria.id)) {
+                  return categoria;
+                }
+
+                // 4️⃣ Filtrar KPIs
+                const kpisFiltrados = categoria.kpis.filter((kpi) =>
+                  favoriteIds.has(kpi.id)
+                );
+
+                if (kpisFiltrados.length > 0) {
+                  return {
+                    ...categoria,
+                    kpis: kpisFiltrados,
+                  };
+                }
+
+                return null;
+              })
+              .filter(Boolean) as ICategoria[];
+
+            if (categoriasFiltradas.length > 0) {
+              return {
+                ...tema,
+                categorias: categoriasFiltradas,
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean) as ITema[];
+
+        if (temasFiltrados.length > 0) {
+          return {
+            ...diretriz,
+            temas: temasFiltrados,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean) as IDiretriz[];
   };
 
   // ------------------------------
@@ -328,6 +406,26 @@ const Dashboard: React.FC<IDashboardProps> = ({
     }));
   };
 
+  const convertHierarchyToMenuTree = (node: any): IGenericNode => {
+    // Detecta filhos possíveis em qualquer nível
+    const children = node.temas || node.categorias || node.kpis || [];
+
+    return {
+      id: node.id,
+      title: node.title,
+      showChildren: true,
+      link: node.link, // só KPIs normalmente terão
+      data: node,
+      children: Array.isArray(children)
+        ? children.map((child) => convertHierarchyToMenuTree(child))
+        : [],
+    };
+  };
+
+  const convertHierarchyListToMenuTree = (nodes: any[]): IGenericNode[] => {
+    return nodes.map((node) => convertHierarchyToMenuTree(node));
+  };
+
   // ------------------------------
   // Função para salvar favorito
   // ------------------------------
@@ -335,20 +433,17 @@ const Dashboard: React.FC<IDashboardProps> = ({
     try {
       const currentUserEmail = context.pageContext.user.email;
 
-      // Inserir o favorito na lista UsuarioListas
-      console.log(item);
       await sp.web.lists.getByTitle("UsuarioListas").items.add({
         Title: item.title,
         email: currentUserEmail,
         addDate: new Date(),
         privado: true,
-        idItem: item.id, // <- array de strings para multi-lookup de texto
+        idItem: item.id,
         nomeGrupo: "Favoritos",
         idGrupo: 1,
       });
 
       console.log("Favorito salvo com sucesso!");
-      // Atualiza favoritos para refletir a mudança
       loadFavoritos();
     } catch (error) {
       console.error("Erro ao salvar favorito", error);
@@ -359,7 +454,6 @@ const Dashboard: React.FC<IDashboardProps> = ({
     try {
       const currentUserEmail = context.pageContext.user.email;
 
-      // Buscar o item correspondente
       const existingItems = await sp.web.lists
         .getByTitle("UsuarioListas")
         .items.select("Id", "idItem", "email")
@@ -370,7 +464,6 @@ const Dashboard: React.FC<IDashboardProps> = ({
         return;
       }
 
-      // Remover todos os registros encontrados
       for (const fav of existingItems) {
         await sp.web.lists
           .getByTitle("UsuarioListas")
@@ -380,7 +473,6 @@ const Dashboard: React.FC<IDashboardProps> = ({
         console.log(`Favorito removido: registro ${fav.Id}`);
       }
 
-      // Atualiza favoritos para refletir a mudança
       loadFavoritos();
     } catch (error) {
       console.error("Erro ao remover favorito", error);
@@ -388,10 +480,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
   };
 
   const onClickFavorite = async (itemId: any) => {
-    const favorited = await isFavorited(itemId);
+    const favorited = await isFavorited(itemId.id);
 
     if (favorited) await removeFavorite(itemId);
     else await saveFavorite(itemId);
+
+    setFavoritedItem(!favorited);
   };
 
   const isFavorited = async (itemId: string): Promise<boolean> => {
@@ -404,8 +498,6 @@ const Dashboard: React.FC<IDashboardProps> = ({
         .filter(
           `email eq '${currentUserEmail}' and idGrupo eq 1 and idItem eq '${itemId}'`
         )();
-
-      console.log("result ", result);
 
       return result.length > 0;
     } catch (err) {
@@ -563,8 +655,78 @@ const Dashboard: React.FC<IDashboardProps> = ({
               </div>
 
               <Star20Filled
-                style={{ color: "#f4b400" }}
-                onClick={() => saveFavorite(selectedKpiData)}
+                style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
+                onClick={() => onClickFavorite(selectedKpiData)}
+              />
+            </div>
+          )}
+          <div
+            id="reportContainer"
+            style={{
+              flex: 1,
+              minHeight: 400,
+              padding: 5,
+              border: "1px solid #ccd",
+              borderRadius: 8,
+              background: "#fff",
+            }}
+          >
+            {!selectedItemLink && (
+              <div style={{ color: "#666" }}>
+                Selecione um item no menu ao lado.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const renderFavorites = (data: IDiretriz[]) => {
+    const menuData = convertHierarchyListToMenuTree(data);
+    return (
+      <div style={{ display: "flex", width: "100%", gap: 5 }}>
+        <MultiLevelMenu
+          data={menuData}
+          onSelect={(item) => {
+            setSelectedItemLink(item.link || item.id);
+            setSelectedSector(item.id);
+            setSelectedKpiData(item.data || null);
+            if (item.data?.link?.Url)
+              powerBIService.embedReport(
+                context,
+                item.data.link.Url,
+                extractReportId(item.data.link.Url) ?? ""
+              );
+          }}
+          menuVisible={menuVisible}
+          onToggleMenu={setMenuVisible}
+        />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          {selectedKpiData && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                background: "#f0f0f0",
+                borderRadius: 5,
+                fontWeight: 600,
+                fontSize: 16,
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Navigation20Regular
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setMenuVisible(!menuVisible)}
+                />
+                <span>{selectedKpiData.title}</span>
+              </div>
+
+              <Star20Filled
+                style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
+                onClick={() => onClickFavorite(selectedKpiData)}
               />
             </div>
           )}
@@ -593,103 +755,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const getContent = () => {
     const data = activeTab === "diretrizes" ? hierarchy : favoriteHierarchy;
 
-    console.log("favoriteHierarchy", favoriteHierarchy);
-
+    // Renderização de FAVORITOS - Exibe menu multinível direto
     if (activeTab === "favoritos") {
-      const menuData: IGenericNode[] = [];
-
-      data.forEach((diretriz: IDiretriz) => {
-        diretriz.temas.forEach((tema: ITema) => {
-          tema.categorias.forEach((categoria: ICategoria) => {
-            const node: IGenericNode = {
-              id: categoria.id,
-              title: categoria.title,
-              showChildren: true,
-              children: categoria.kpis.map((k: IKpi) => ({
-                id: k.id,
-                title: k.title,
-                link: k.id,
-                data: k,
-              })),
-            };
-            menuData.push(node);
-          });
-        });
-      });
-
-      return (
-        <div style={{ display: "flex", width: "100%", gap: 5 }}>
-          <MultiLevelMenu
-            data={menuData}
-            onSelect={(item) => {
-              setSelectedItemLink(item.link || item.id);
-              setSelectedSector(item.id);
-              setSelectedKpiData(item.data || null);
-
-              if (item.data?.link?.Url)
-                powerBIService.embedReport(
-                  context,
-                  item.data.link.Url,
-                  extractReportId(item.data.link.Url) ?? ""
-                );
-            }}
-            menuVisible={menuVisible}
-            onToggleMenu={setMenuVisible}
-          />
-
-          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            {selectedKpiData && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 16px",
-                  background: "#f0f0f0",
-                  borderRadius: 5,
-                  fontWeight: 600,
-                  fontSize: 16,
-                  marginBottom: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Navigation20Regular
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setMenuVisible(!menuVisible)}
-                  />
-                  <span>{selectedKpiData.title}</span>
-                </div>
-
-                <Star20Filled
-                  style={{ color: "#f4b400" }}
-                  onClick={() => saveFavorite(selectedKpiData)}
-                />
-              </div>
-            )}
-
-            <div
-              id="reportContainer"
-              style={{
-                flex: 1,
-                minHeight: 400,
-                padding: 5,
-                border: "1px solid #ccd",
-                borderRadius: 8,
-                background: "#fff",
-              }}
-            >
-              {!selectedItemLink && (
-                <div style={{ color: "#666" }}>
-                  Selecione um item no menu à esquerda.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      );
+      return renderFavorites(data);
     }
 
-    // 🔥 Comportamento normal quando estiver em DIRETRIZES
+    // Comportamento normal quando estiver em DIRETRIZES
     if (!selectedDiretriz) return renderDiretrizes(data);
     if (!selectedTema) return renderTemas(data);
     return renderCategorias(data);
@@ -712,7 +783,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         <Tab value="diretrizes">Diretrizes</Tab>
         <Tab value="favoritos">Favoritos</Tab>
       </TabList>
-      {renderBreadcrumb()}
+      {activeTab === "diretrizes" && renderBreadcrumb()}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
         {getContent()}
       </div>
