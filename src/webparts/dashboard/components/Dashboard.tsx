@@ -10,6 +10,7 @@ import {
   ChevronLeft20Filled,
   Navigation20Regular,
   Star20Filled,
+  ArrowExpand20Regular,
 } from "@fluentui/react-icons";
 import MultiLevelMenu, { IGenericNode } from "./MultiLeveMenu";
 import { PowerBIService } from "../../../services/PowerBIService";
@@ -85,9 +86,16 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [activeTab, setActiveTab] = useState<"diretrizes" | "favoritos">(
     "diretrizes"
   );
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
-  const powerBIService = new PowerBIService();
+  const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
+
+  if (!powerBIServiceRef.current) {
+    powerBIServiceRef.current = new PowerBIService();
+  }
+
+  const powerBIService = powerBIServiceRef.current;
 
   useEffect(() => {
     loadBaseDados();
@@ -482,8 +490,10 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const onClickFavorite = async (itemId: any) => {
     const favorited = await isFavorited(itemId.id);
 
-    if (favorited) await removeFavorite(itemId);
-    else await saveFavorite(itemId);
+    if (favorited) {
+      await removeFavorite(itemId);
+      // setSelectedKpiData(null);
+    } else await saveFavorite(itemId);
 
     setFavoritedItem(!favorited);
   };
@@ -506,6 +516,11 @@ const Dashboard: React.FC<IDashboardProps> = ({
     }
   };
 
+  const handleToggleFullscreen = () => {
+    // console.log("isFullscreen", isFullscreen);
+    powerBIService.toggleFullscreen(false);
+    // setIsFullscreen((prev) => !prev);
+  };
   // ------------------------------
   // Render Breadcrumb
   // ------------------------------
@@ -654,10 +669,35 @@ const Dashboard: React.FC<IDashboardProps> = ({
                 <span>{selectedKpiData.title}</span>
               </div>
 
-              <Star20Filled
-                style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
-                onClick={() => onClickFavorite(selectedKpiData)}
-              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* Botão Tela Cheia */}
+                <div
+                  onClick={handleToggleFullscreen}
+                  title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                  style={{
+                    cursor: "pointer",
+                    padding: 4,
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {isFullscreen ? (
+                    <ArrowExpand20Regular />
+                  ) : (
+                    <ArrowExpand20Regular />
+                  )}
+                </div>
+
+                {/* Favorito */}
+                <Star20Filled
+                  style={{
+                    color: isFavoritedItem ? "#f4b400" : "grey",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onClickFavorite(selectedKpiData)}
+                />
+              </div>
             </div>
           )}
           <div
@@ -723,11 +763,39 @@ const Dashboard: React.FC<IDashboardProps> = ({
                 />
                 <span>{selectedKpiData.title}</span>
               </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {/* Botão Tela Cheia */}
+                <div
+                  onClick={handleToggleFullscreen}
+                  title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                  style={{
+                    cursor: "pointer",
+                    padding: 4,
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {isFullscreen ? (
+                    <ArrowExpand20Regular />
+                  ) : (
+                    <ArrowExpand20Regular />
+                  )}
+                </div>
 
-              <Star20Filled
+                {/* Favorito */}
+                <Star20Filled
+                  style={{
+                    color: isFavoritedItem ? "#f4b400" : "grey",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onClickFavorite(selectedKpiData)}
+                />
+              </div>
+              {/* <Star20Filled
                 style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
                 onClick={() => onClickFavorite(selectedKpiData)}
-              />
+              /> */}
             </div>
           )}
           <div
