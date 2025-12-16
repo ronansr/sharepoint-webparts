@@ -654,7 +654,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
               powerBIService.embedReport(
                 context,
                 item.data.link.Url,
-                extractReportId(item.data.link.Url) ?? ""
+                extractReportId(item.data.link.Url) ?? "",
+                item?.data?.paginaRelatorioBI,
+                item?.data?.filtroKpiSelecionado
               );
           }}
           menuVisible={menuVisible}
@@ -766,7 +768,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
               powerBIService.embedReport(
                 context,
                 item.data.link.Url,
-                extractReportId(item.data.link.Url) ?? ""
+                extractReportId(item.data.link.Url) ?? "",
+                item?.data?.paginaRelatorioBI,
+                item?.data?.filtroKpiSelecionado
               );
           }}
           menuVisible={menuVisible}
@@ -930,7 +934,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
               powerBIService.embedReport(
                 context,
                 item.data.link.Url,
-                extractReportId(item.data.link.Url) ?? ""
+                extractReportId(item.data.link.Url) ?? "",
+                item?.data?.paginaRelatorioBI,
+                item?.data?.filtroKpiSelecionado
               );
           }}
           menuVisible={menuVisible}
