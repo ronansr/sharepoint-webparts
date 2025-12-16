@@ -582,7 +582,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         {selectedDiretriz && (
           <>
             {" "}
-            <span>{">"}</span>{" "}
+            <span>{"> "}</span>{" "}
             <span
               style={{
                 cursor: "pointer",
@@ -590,15 +590,17 @@ const Dashboard: React.FC<IDashboardProps> = ({
               }}
               onClick={() => setSelectedTema(null)}
             >
-              {selectedDiretriz.title}
+              Diretriz: {selectedDiretriz.title}
             </span>{" "}
           </>
         )}
         {selectedTema && (
           <>
             {" "}
-            <span>{">"}</span>{" "}
-            <span style={{ fontWeight: "bold" }}>{selectedTema.title}</span>{" "}
+            <span>{"> "}</span>{" "}
+            <span style={{ fontWeight: "bold" }}>
+              Tema: {selectedTema.title}
+            </span>{" "}
           </>
         )}
       </div>

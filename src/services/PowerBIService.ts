@@ -15,6 +15,9 @@ export class PowerBIService {
   private currentReportId?: string;
   private isReportLoaded: boolean = false;
 
+  private domObserver?: MutationObserver;
+  private isContainerMounted: boolean = false;
+
   constructor() {
     this.powerbi = new pbi.service.Service(
       pbi.factories.hpmFactory,
@@ -35,6 +38,9 @@ export class PowerBIService {
       console.error("❌ reportContainer não encontrado");
       return;
     }
+
+    this.isContainerMounted = true;
+    this.observeContainerLifecycle("reportContainer");
 
     // ===============================
     // 🔁 RELATÓRIO JÁ CARREGADO
@@ -316,6 +322,7 @@ export class PowerBIService {
 
     window.removeEventListener("resize", this.handleWindowResize);
     this.powerbi.reset(container);
+    this.destroyInternal();
 
     this.isResizing = false;
     this.isReportLoaded = false;
@@ -350,6 +357,56 @@ export class PowerBIService {
     this.powerbi.reset(container);
     container.innerHTML = "";
 
+    this.isReportLoaded = false;
+    this.currentEmbedUrl = undefined;
+    this.currentReportId = undefined;
+  }
+
+  private observeContainerLifecycle(containerId: string = "reportContainer") {
+    if (this.domObserver) {
+      this.domObserver.disconnect();
+    }
+
+    this.domObserver = new MutationObserver(() => {
+      const container = document.getElementById(containerId);
+
+      // ❌ Container foi removido
+      if (!container && this.isContainerMounted) {
+        console.warn(
+          "🧨 reportContainer removido do DOM — destruindo relatório"
+        );
+
+        this.isContainerMounted = false;
+        this.destroyInternal();
+      }
+
+      // ✅ Container voltou
+      if (container && !this.isContainerMounted) {
+        console.log("🔄 reportContainer remontado no DOM");
+        this.isContainerMounted = true;
+      }
+    });
+
+    this.domObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private destroyInternal() {
+    if (this.resizeTimeout) window.clearTimeout(this.resizeTimeout);
+    if (this.resizeObserver) this.resizeObserver.disconnect();
+
+    window.removeEventListener("resize", this.handleWindowResize);
+
+    if (this.report) {
+      try {
+        this.report.off("loaded");
+      } catch {}
+    }
+
+    this.report = undefined;
+    this.isResizing = false;
     this.isReportLoaded = false;
     this.currentEmbedUrl = undefined;
     this.currentReportId = undefined;
