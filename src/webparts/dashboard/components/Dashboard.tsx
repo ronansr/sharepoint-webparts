@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SPFI, spfi } from "@pnp/sp";
 import { SPBrowser } from "@pnp/sp";
 import "@pnp/sp/webs";
@@ -632,7 +632,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         key={t.id}
         id={t.id}
         title={t.title}
-        description="Tema"
+        description={t.descricao}
         onClick={() => setSelectedTema(t)}
         onStarClick={() => onClickFavorite(t)}
         context={context}

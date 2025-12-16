@@ -59,7 +59,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         display: "flex",
         flexDirection: "column",
         width: 320,
-        height: 200,
+        minHeight: 200,
         border: "1px solid #A3A3A3",
         borderRadius: 5,
         background: "#FFF",
@@ -102,25 +102,38 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         style={{
           flex: 1,
           display: "flex",
-          flexDirection: "column", // 👉 agora em coluna
+          flexDirection: "column",
           padding: "10px 20px",
           background: "#FFFFFF",
-          fontSize: 14,
+          fontSize: 12,
           color: "#333",
           position: "relative",
+          overflow: "hidden", // 🔒 impede crescer
         }}
       >
-        {/* Descrição (TOPO ESQUERDA) */}
-        <span
+        {/* DESCRIÇÃO COM SCROLL */}
+        <div
           style={{
-            fontWeight: 500,
-            alignSelf: "flex-start",
+            flex: 1,
+            overflowY: "auto", // ✅ scroll interno
+            paddingRight: 10, // espaço p/ scrollbar
+            marginBottom: 24, // não colide com estrela
           }}
         >
-          {description || "SEM DESCRICAO"}
-        </span>
+          <span
+            style={{
+              fontWeight: 500,
+              display: "block",
+              whiteSpace: "pre-wrap",
+              lineHeight: 1.4,
+              paddingRight: 5,
+            }}
+          >
+            {description || "SEM DESCRIÇÃO"}
+          </span>
+        </div>
 
-        {/* Chevron (DIREITA, CENTRALIZADO VERTICALMENTE) */}
+        {/* Chevron (DIREITA, CENTRALIZADO) */}
         <div
           onClick={onClick}
           style={{

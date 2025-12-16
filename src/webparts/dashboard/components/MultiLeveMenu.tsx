@@ -3,6 +3,7 @@ import {
   ChevronRight20Filled,
   ChevronDown20Filled,
   Search20Regular,
+  CheckmarkCircle20Filled,
 } from "@fluentui/react-icons";
 import { normalizeText } from "../../../utils";
 
@@ -12,6 +13,12 @@ export interface IGenericNode {
   link?: string;
   children?: IGenericNode[];
   data?: any;
+  // data?: {
+  //   kpiValidado?: boolean;
+  //   esconderNoMenu?: boolean;
+  //   menuVisible?: boolean;
+  //   [key: string]: any;
+  // };
   showChildren?: boolean;
 }
 
@@ -112,15 +119,18 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
         const hasChildren =
           !!node.children?.length && node.showChildren !== false;
         const isSelected = selected === node.id;
+        const isSelectable = !!node.link;
+        console.log(node?.data);
 
         return (
           <div key={node.id} style={{ marginBottom: 2 }}>
             <div
               onClick={() => {
-                if (hasChildren) toggle(node.id);
-                if (node.link || !hasChildren) {
+                if (isSelectable) {
                   setSelected(node.id);
                   onSelect(node);
+                } else if (hasChildren) {
+                  toggle(node.id);
                 }
               }}
               onMouseEnter={(e) => {
@@ -145,10 +155,28 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
                 transition: "background 0.15s ease",
               }}
             >
+              {/* TEXTO → SELECIONA */}
               <span>{node.title}</span>
+              {node?.data?.kpiValidado ? (
+                <CheckmarkCircle20Filled color={"#2e7d32"} />
+              ) : (
+                <></>
+              )}
 
+              {/* CHEVRON → EXPANDE */}
               {hasChildren && (
-                <span style={{ marginLeft: 8 }}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation(); // 🔒 não dispara seleção
+                    toggle(node.id);
+                  }}
+                  style={{
+                    marginLeft: 8,
+                    display: "flex",
+                    alignItems: "center",
+                    cursor: "pointer",
+                  }}
+                >
                   {isOpen ? (
                     <ChevronDown20Filled
                       color={isSelected ? "white" : "black"}
