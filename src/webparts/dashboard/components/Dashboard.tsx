@@ -157,129 +157,11 @@ const Dashboard: React.FC<IDashboardProps> = ({
 
       const hierarchyFav = getFavoritesOnly(hierarchy, favorites);
 
-      console.log(hierarchyFav);
+      // console.log(hierarchyFav);
 
       setFavoriteHierarchy(hierarchyFav);
 
       return;
-
-      // 2. Buscar todos os itens da BaseDados
-      const baseDados: BaseDados[] = await sp.web.lists
-        .getByTitle("BaseDados")
-        .items();
-
-      // 3. Criar mapa para acesso rápido
-      const itemMap: { [key: string]: BaseDados } = {};
-      baseDados.forEach((item) => {
-        if (item.id0) {
-          itemMap[item.id0] = item;
-        }
-      });
-
-      // 4. Estrutura para armazenar hierarquia de favoritos
-      const structuredMap: { [key: string]: IDiretriz } = {};
-
-      // 5. Para cada favorito, reconstruir a hierarquia completa
-      favorites.forEach((fav) => {
-        const favItem = itemMap[fav.idItem || ""];
-        if (!favItem) return;
-
-        // Determinar o tipo do item favorito
-        const isDiretriz = favItem.diretriz && !favItem.tema;
-        const isTema = favItem.diretriz && favItem.tema && !favItem.categoria;
-        const isCategoria =
-          favItem.diretriz &&
-          favItem.tema &&
-          favItem.categoria &&
-          !favItem.kpisId;
-        const isKpi = favItem.categoria && favItem.kpisId;
-
-        // Buscar a Diretriz
-        const diretrizId = favItem.diretriz || favItem.id0;
-        const diretrizItem = itemMap[diretrizId || ""];
-        if (!diretrizItem) return;
-
-        // Criar/Obter Diretriz
-        if (!structuredMap[diretrizId || ""]) {
-          structuredMap[diretrizId || ""] = {
-            id: diretrizId || "",
-            title: diretrizItem.Title,
-            descricao: diretrizItem.descricao,
-            temas: [],
-          };
-        }
-        const diretriz = structuredMap[diretrizId || ""];
-
-        // Se for apenas diretriz, já está ok
-        if (isDiretriz) return;
-
-        // Buscar o Tema
-        const temaId = favItem.tema || (isTema ? favItem.id0 : null);
-        if (!temaId) return;
-
-        const temaItem = itemMap[temaId];
-        if (!temaItem) return;
-
-        // Criar/Obter Tema
-        let tema = diretriz.temas.find((t) => t.id === temaId);
-        if (!tema) {
-          tema = {
-            id: temaId,
-            title: temaItem.Title,
-            descricao: temaItem.descricao,
-            categorias: [],
-          };
-          diretriz.temas.push(tema);
-        }
-
-        // Se for apenas tema, já está ok
-        if (isTema) return;
-
-        // Buscar a Categoria
-        const categoriaId =
-          favItem.categoria || (isCategoria ? favItem.id0 : null);
-        if (!categoriaId) return;
-
-        const categoriaItem = itemMap[categoriaId];
-        if (!categoriaItem) return;
-
-        // Criar/Obter Categoria
-        let categoria = tema.categorias.find((c) => c.id === categoriaId);
-        if (!categoria) {
-          categoria = {
-            id: categoriaId,
-            title: categoriaItem.Title,
-            kpis: [],
-          };
-          tema.categorias.push(categoria);
-        }
-
-        // Se for apenas categoria, já está ok
-        if (isCategoria) return;
-
-        // Buscar KPIs da categoria
-        if (categoriaItem.kpisId && categoriaItem.kpisId.length > 0) {
-          categoriaItem.kpisId.forEach((kpiId: any) => {
-            const kpiItem = baseDados.find((k) => k.Id === kpiId);
-            if (
-              kpiItem &&
-              !categoria?.kpis.find((k) => k.id === kpiId.toString())
-            ) {
-              categoria?.kpis.push({
-                id: kpiId.toString(),
-                title: kpiItem.Title,
-                ...kpiItem,
-              });
-            }
-          });
-        }
-      });
-
-      setFavoriteHierarchy(Object.values(structuredMap));
-      console.log(
-        "Hierarquia de favoritos carregada:",
-        Object.values(structuredMap)
-      );
     } catch (error) {
       console.error("Erro ao carregar favoritos", error);
       setFavoriteHierarchy([]);
@@ -361,13 +243,15 @@ const Dashboard: React.FC<IDashboardProps> = ({
     const map: { [key: string]: IDiretriz } = {};
     items.forEach((item) => {
       if (!item.diretriz) return;
-      if (!map[item.diretriz])
+      if (!map[item.diretriz]) {
         map[item.diretriz] = {
           id: item.diretriz,
           title: item.Title,
           descricao: item.descricao,
           temas: [],
+          extradata: item?.extradata ? JSON.parse(item.extradata) : null,
         };
+      }
       const diretriz = map[item.diretriz];
 
       if (item.tema) {
@@ -616,18 +500,27 @@ const Dashboard: React.FC<IDashboardProps> = ({
   // Render Diretrizes/Temas/Categorias
   // ------------------------------
   const renderDiretrizes = (data: IDiretriz[]) =>
-    data.map((d) => (
-      <SectorCard
-        key={d.id}
-        id={d.id}
-        title={d.title}
-        description={d.descricao}
-        onClick={() => setSelectedDiretriz(d)}
-        onStarClick={() => onClickFavorite(d)}
-        context={context}
-        siteUrl={siteUrl}
-      />
-    ));
+    [...data]
+      .sort((a, b) => {
+        const aBuilding = !!a.extradata?.isBuilding;
+        const bBuilding = !!b.extradata?.isBuilding;
+
+        if (aBuilding === bBuilding) return 0;
+        return aBuilding ? 1 : -1;
+      })
+      .map((d) => (
+        <SectorCard
+          key={d.id}
+          id={d.id}
+          title={d.title}
+          description={d.descricao}
+          onClick={() => setSelectedDiretriz(d)}
+          onStarClick={() => onClickFavorite(d)}
+          context={context}
+          siteUrl={siteUrl}
+          isBuilding={d.extradata?.isBuilding}
+        />
+      ));
   const renderTemas = (data: IDiretriz[]) =>
     selectedDiretriz?.temas.map((t) => (
       <SectorCard
@@ -943,6 +836,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
           }}
           menuVisible={menuVisible}
           onToggleMenu={setMenuVisible}
+          expandAll
           // hideSearch
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -1080,7 +974,14 @@ const Dashboard: React.FC<IDashboardProps> = ({
         </>
       )}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 16,
+          // justifyContent: "space-evenly",
+        }}
+      >
         {getContent()}
       </div>
     </div>

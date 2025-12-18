@@ -28,6 +28,7 @@ interface IMultiLevelMenuProps {
   menuVisible?: boolean;
   onToggleMenu?: (visible: boolean) => void;
   hideSearch?: boolean;
+  expandAll?: boolean;
 }
 
 /**
@@ -42,13 +43,26 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
   menuVisible,
   onToggleMenu,
   hideSearch,
+  expandAll,
 }) => {
   const [expanded, setExpanded] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(true);
 
-  const isMenuOpen = menuVisible !== undefined ? menuVisible : menuOpen;
+  const isMenuOpen =
+    expandAll === true
+      ? true
+      : menuVisible !== undefined
+      ? menuVisible
+      : menuOpen;
+
+  React.useEffect(() => {
+    if (expandAll) {
+      const allIds = getAllExpandableIds(data);
+      setExpanded(allIds);
+    }
+  }, [expandAll, data]);
 
   const toggleMenu = () => {
     if (onToggleMenu) {
@@ -62,6 +76,19 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
     setExpanded((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
+  };
+
+  const getAllExpandableIds = (nodes: IGenericNode[]): string[] => {
+    let ids: string[] = [];
+
+    for (const node of nodes) {
+      if (node.children?.length && !isHiddenInMenu(node)) {
+        ids.push(node.id);
+        ids = ids.concat(getAllExpandableIds(node.children));
+      }
+    }
+
+    return ids;
   };
 
   /**
@@ -81,12 +108,10 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
 
       // Sem busca → só respeita visibilidade
       if (!q.trim()) {
-        if (filteredChildren.length > 0 || node.link) {
-          result.push({
-            ...node,
-            children: filteredChildren,
-          });
-        }
+        result.push({
+          ...node,
+          children: filteredChildren,
+        });
         continue;
       }
 
@@ -120,7 +145,6 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
           !!node.children?.length && node.showChildren !== false;
         const isSelected = selected === node.id;
         const isSelectable = !!node.link;
-        console.log(node?.data);
 
         return (
           <div key={node.id} style={{ marginBottom: 2 }}>
@@ -190,9 +214,23 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
               )}
             </div>
 
-            {hasChildren && isOpen && (
-              <div style={{ marginTop: 4 }}>
-                {renderTree(node.children ?? [], level + 1)}
+            {hasChildren && (
+              <div
+                style={{
+                  maxHeight: isOpen ? 1000 : 0, // valor alto para comportar os filhos
+                  overflow: "hidden",
+                  transition: "max-height 0.3s ease",
+                  marginTop: isOpen ? 4 : 0,
+                }}
+              >
+                <div
+                  style={{
+                    opacity: isOpen ? 1 : 0,
+                    transition: "opacity 0.3s ease",
+                  }}
+                >
+                  {renderTree(node.children ?? [], level + 1)}
+                </div>
               </div>
             )}
           </div>

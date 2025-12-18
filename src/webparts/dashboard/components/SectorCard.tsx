@@ -7,6 +7,7 @@ import { SPBrowser } from "@pnp/sp";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
+
 interface ISectorCardProps {
   title: string;
   description?: string;
@@ -15,6 +16,7 @@ interface ISectorCardProps {
   context: WebPartContext;
   siteUrl: string;
   id: any;
+  isBuilding?: boolean; // 🆕 NOVA PROP
 }
 
 const SectorCard: React.FC<ISectorCardProps> = ({
@@ -25,6 +27,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
   context,
   siteUrl,
   id,
+  isBuilding = false,
 }) => {
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
   const [isFav, setIsFav] = React.useState(false);
@@ -39,8 +42,8 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         .filter(
           `email eq '${currentUserEmail}' and idGrupo eq 1 and idItem eq '${itemId}'`
         )();
-      if (result.length > 0) setIsFav(true);
-      else setIsFav(false);
+
+      setIsFav(result.length > 0);
       return result.length > 0;
     } catch (err) {
       console.error("Erro ao verificar favoritos:", err);
@@ -60,6 +63,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         flexDirection: "column",
         width: 320,
         minHeight: 200,
+        height: 260,
         border: "1px solid #A3A3A3",
         borderRadius: 5,
         background: "#FFF",
@@ -100,24 +104,37 @@ const SectorCard: React.FC<ISectorCardProps> = ({
       {/* BOTTOM SECTION */}
       <div
         style={{
-          flex: 1,
+          height: 180, // ✅ tamanho fixo do bottom
           display: "flex",
           flexDirection: "column",
           padding: "10px 20px",
-          background: "#FFFFFF",
           fontSize: 12,
           color: "#333",
           position: "relative",
-          overflow: "hidden", // 🔒 impede crescer
+          overflow: "hidden",
+
+          // 🧊 GLASS EFFECT
+          background: isBuilding ? "rgba(255, 255, 255, 0.45)" : "#FFFFFF",
+
+          backdropFilter: isBuilding ? "blur(8px)" : "none",
+          WebkitBackdropFilter: isBuilding ? "blur(8px)" : "none",
+
+          borderTop: isBuilding ? "1px solid rgba(255,255,255,0.6)" : undefined,
+
+          boxShadow: isBuilding
+            ? "inset 0 0 0 1px rgba(255,255,255,0.4)"
+            : undefined,
+
+          pointerEvents: isBuilding ? "none" : "auto",
         }}
       >
-        {/* DESCRIÇÃO COM SCROLL */}
+        {/* DESCRIÇÃO */}
         <div
           style={{
             flex: 1,
-            overflowY: "auto", // ✅ scroll interno
-            paddingRight: 10, // espaço p/ scrollbar
-            marginBottom: 24, // não colide com estrela
+            overflowY: "auto",
+            paddingRight: 10,
+            marginBottom: 24,
           }}
         >
           <span
@@ -133,23 +150,24 @@ const SectorCard: React.FC<ISectorCardProps> = ({
           </span>
         </div>
 
-        {/* Chevron (DIREITA, CENTRALIZADO) */}
+        {/* Chevron */}
         <div
-          onClick={onClick}
+          onClick={!isBuilding ? onClick : undefined}
           style={{
             position: "absolute",
             right: 20,
             top: "50%",
             transform: "translateY(-50%)",
-            cursor: "pointer",
+            cursor: isBuilding ? "default" : "pointer",
           }}
         >
           <ChevronRight20Filled style={{ color: "#333" }} />
         </div>
 
-        {/* Estrela (INFERIOR DIREITA) */}
+        {/* Estrela */}
         <div
           onClick={(e) => {
+            if (isBuilding) return;
             e.stopPropagation();
             onStarClick?.();
             setIsFav((prev) => !prev);
@@ -158,11 +176,32 @@ const SectorCard: React.FC<ISectorCardProps> = ({
             position: "absolute",
             bottom: 10,
             right: 12,
-            cursor: "pointer",
+            cursor: isBuilding ? "default" : "pointer",
           }}
         >
           <Star20Filled style={{ color: isFav ? "#f4b400" : "gray" }} />
         </div>
+
+        {/* 🛑 OVERLAY "EM DESENVOLVIMENTO" */}
+        {isBuilding && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(255,255,255,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 700,
+              fontSize: 16,
+              color: "#1e1e1e",
+              textTransform: "uppercase",
+              pointerEvents: "none",
+            }}
+          >
+            Em desenvolvimento
+          </div>
+        )}
       </div>
     </div>
   );

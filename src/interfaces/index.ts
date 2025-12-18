@@ -20,4 +20,5 @@ interface IDiretriz {
   title: string;
   descricao?: string;
   temas: ITema[];
+  extradata?: any;
 }

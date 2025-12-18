@@ -22,19 +22,34 @@ export const filterHierarchy = (
     .map((d) => {
       const diretrizMatch = normalizeText(d.title).includes(term);
 
+      // 🔹 Se a diretriz bate → retorna tudo
+      if (diretrizMatch) {
+        return d;
+      }
+
       const temas = d.temas
         .map((t) => {
           const temaMatch = normalizeText(t.title).includes(term);
+
+          // 🔹 Se o tema bate → retorna tema completo
+          if (temaMatch) {
+            return t;
+          }
 
           const categorias = t.categorias
             .map((c) => {
               const categoriaMatch = normalizeText(c.title).includes(term);
 
+              // 🔹 Se categoria bate → retorna categoria completa
+              if (categoriaMatch) {
+                return c;
+              }
+
               const kpis = c.kpis.filter((k) =>
                 normalizeText(k.title).includes(term)
               );
 
-              if (categoriaMatch || kpis.length > 0) {
+              if (kpis.length > 0) {
                 return { ...c, kpis };
               }
 
@@ -42,7 +57,7 @@ export const filterHierarchy = (
             })
             .filter(Boolean) as ICategoria[];
 
-          if (temaMatch || categorias.length > 0) {
+          if (categorias.length > 0) {
             return { ...t, categorias };
           }
 
@@ -50,7 +65,7 @@ export const filterHierarchy = (
         })
         .filter(Boolean) as ITema[];
 
-      if (diretrizMatch || temas.length > 0) {
+      if (temas.length > 0) {
         return { ...d, temas };
       }
 
