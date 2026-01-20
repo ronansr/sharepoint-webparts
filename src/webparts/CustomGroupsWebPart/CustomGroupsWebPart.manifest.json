@@ -1,0 +1,19 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "b3d7b7e1-5b91-4c89-9f9c-2c2b5fa1b222",
+  "alias": "CustomGroupsWebPart",
+  "componentType": "WebPart",
+  "version": "1.0.0",
+  "manifestVersion": 2,
+  "supportsFullBleed": true,
+  "preconfiguredEntries": [
+    {
+      "title": { "default": "Grupos Personalizados" },
+      "description": {
+        "default": "Criação de grupos personalizados a partir da Base de Dados"
+      },
+      "officeFabricIconFontName": "Group",
+      "properties": {}
+    }
+  ]
+}

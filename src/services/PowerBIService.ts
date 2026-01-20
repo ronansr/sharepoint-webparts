@@ -10,7 +10,7 @@ export class PowerBIService {
   private isResizing: boolean = false;
   private lastContainerWidth?: number;
 
-  // 🔒 Controle de estado do relatório atual
+  // 🔒 Estado do relatório atual
   private currentEmbedUrl?: string;
   private currentReportId?: string;
   private isReportLoaded: boolean = false;
@@ -18,13 +18,25 @@ export class PowerBIService {
   private domObserver?: MutationObserver;
   private isContainerMounted: boolean = false;
 
-  constructor() {
+  private containerId: string;
+
+  constructor(containerId: string) {
+    this.containerId = containerId;
+
     this.powerbi = new pbi.service.Service(
       pbi.factories.hpmFactory,
       pbi.factories.wpmpFactory,
       pbi.factories.routerFactory
     );
   }
+
+  /* ===================== UTIL ===================== */
+
+  private getContainer(): HTMLElement | null {
+    return document.getElementById(this.containerId);
+  }
+
+  /* ===================== EMBED ===================== */
 
   public async embedReport(
     context: WebPartContext,
@@ -33,43 +45,14 @@ export class PowerBIService {
     paginaRelatorioBI?: string,
     filtroKpiSelecionado?: string
   ): Promise<void> {
-    const container = document.getElementById("reportContainer");
+    const container = this.getContainer();
+
     if (!container) {
-      console.error("❌ reportContainer não encontrado");
+      console.error(`❌ Container ${this.containerId} não encontrado`);
       return;
     }
 
-    this.isContainerMounted = true;
-    this.observeContainerLifecycle("reportContainer");
-
-    // ===============================
-    // 🔁 RELATÓRIO JÁ CARREGADO
-    // ===============================
-    if (
-      this.report &&
-      this.isReportLoaded &&
-      this.currentEmbedUrl === embedUrl &&
-      this.currentReportId === reportId
-    ) {
-      console.log("🔁 Relatório já carregado — atualizando página e filtro");
-
-      if (paginaRelatorioBI) {
-        await this.navigateToPageByIndex(paginaRelatorioBI);
-        await new Promise((r) => setTimeout(r, 300));
-      }
-
-      if (filtroKpiSelecionado) {
-        await this.applyKpiSlicerFilter(filtroKpiSelecionado);
-      }
-
-      this.forceResize();
-      return;
-    }
-
-    // ===============================
-    // 🆕 NOVO RELATÓRIO
-    // ===============================
-    console.log("🆕 Carregando novo relatório Power BI");
+    this.powerbi.reset(container);
 
     const tokenProvider =
       await context.aadTokenProviderFactory.getTokenProvider();
@@ -77,8 +60,6 @@ export class PowerBIService {
     const token = await tokenProvider.getToken(
       "https://analysis.windows.net/powerbi/api"
     );
-
-    this.powerbi.reset(container);
 
     const config: pbi.IEmbedConfiguration = {
       type: "report",
@@ -99,43 +80,32 @@ export class PowerBIService {
 
     this.report = this.powerbi.embed(container, config) as pbi.Report;
 
-    this.currentEmbedUrl = embedUrl;
-    this.currentReportId = reportId;
-    this.isReportLoaded = false;
+    this.observeResize(container);
+    this.observeContainerLifecycle();
 
     this.report.on("loaded", async () => {
-      console.log("✅ Relatório carregado");
-
       this.isReportLoaded = true;
 
       if (paginaRelatorioBI) {
         await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
-        await new Promise((r) => setTimeout(r, 300));
       }
 
       if (filtroKpiSelecionado) {
         await this.applyKpiSlicerFilter(filtroKpiSelecionado);
       }
-
-      setTimeout(() => this.forceResize(), 150);
     });
-
-    this.observeResize(container);
-    window.addEventListener("resize", this.handleWindowResize);
   }
 
-  // ▶ Navega para página específica pelo nome
+  /* ===================== NAVEGAÇÃO ===================== */
+
   private async navigateToPage(pageName: string) {
     if (!this.report) return;
 
     const pages = await this.report.getPages();
-    const targetPage = pages.find((p) => p.name === pageName);
+    const page = pages.find((p) => p.name === pageName);
 
-    if (targetPage) {
-      await targetPage.setActive();
-      console.log("📄 Página ativada:", pageName);
-    } else {
-      console.warn("⚠️ Página não encontrada:", pageName);
+    if (page) {
+      await page.setActive();
     }
   }
 
@@ -145,85 +115,30 @@ export class PowerBIService {
     const pages = await this.report.getPages();
     const index = Number(pageIndex);
 
-    console.warn("Quantidade de paginas do relatorio", pages.length);
-    if (isNaN(index) || index < 1 || index > pages.length) {
-      console.warn("⚠️ Índice de página inválido:", pageIndex);
-      return;
-    }
+    if (isNaN(index) || index < 1 || index > pages.length) return;
 
-    const page = pages[index - 1];
-    await page.setActive();
-
-    console.log("📄 Página ativada:", page.displayName);
+    await pages[index - 1].setActive();
   }
 
   private async navigateToNavbarPageByIndex(navbarIndex: string) {
     if (!this.report) return;
 
     const pages = await this.report.getPages();
+    const visiblePages = pages.filter((p: any) => !p.visibility);
     const index = Number(navbarIndex);
 
-    // 📌 Apenas páginas visíveis no navbar
-    // console.warn("pages", pages);
+    if (isNaN(index) || index < 1 || index > visiblePages.length) return;
 
-    const visiblePages = pages.filter((p: any) => !p.visibility);
-
-    console.warn(
-      "📑 Total de páginas visíveis no navbar:",
-      visiblePages.length
-    );
-
-    if (isNaN(index) || index < 1 || index > visiblePages.length) {
-      console.warn("⚠️ Índice de navbar inválido:", navbarIndex);
-      return;
-    }
-
-    const page = visiblePages[index - 1];
-    await page.setActive();
-
-    console.log(
-      "📄 Página ativada via navbar:",
-      page.displayName,
-      `(index navbar: ${index})`
-    );
+    await visiblePages[index - 1].setActive();
   }
 
-  private async logActivePageSlicers() {
+  /* ===================== SLICER ===================== */
+
+  private async applyKpiSlicerFilter(filtro: string) {
     if (!this.report) return;
 
     const pages = await this.report.getPages();
     const activePage = pages.find((p) => p.isActive);
-
-    if (!activePage) return;
-
-    const visuals = await activePage.getVisuals();
-    const slicers = visuals.filter((v) => v.type === "slicer");
-
-    console.group(`🎛️ Slicers da página ativa: ${activePage.displayName}`);
-
-    for (const slicer of slicers) {
-      console.group(`Slicer: ${slicer.name}`);
-      console.log("title:", slicer.title);
-
-      try {
-        const state = await slicer.getSlicerState();
-        console.log("Slicer state:", state);
-      } catch (err) {
-        console.warn("⚠️ Não foi possível ler slicer:", err);
-      }
-
-      console.groupEnd();
-    }
-
-    console.groupEnd();
-  }
-
-  private async applyKpiSlicerFilter(filtroKpiSelecionado: string) {
-    if (!this.report) return;
-
-    const pages = await this.report.getPages();
-    const activePage = pages.find((p) => p.isActive);
-
     if (!activePage) return;
 
     const visuals = await activePage.getVisuals();
@@ -233,44 +148,40 @@ export class PowerBIService {
       try {
         const state = await slicer.getSlicerState();
 
-        const hasKpiTarget = state.targets?.some(
+        const hasTarget = state.targets?.some(
           (t: any) => t.table === "KPI" && t.column === "KPI Selecionado"
         );
 
-        if (!hasKpiTarget) continue;
-
-        console.log("🎯 Slicer KPI encontrado:", slicer.name);
+        if (!hasTarget) continue;
 
         await slicer.setSlicerState({
           targets: [{ table: "KPI", column: "KPI Selecionado" }],
           filters: [
             {
               $schema: "http://powerbi.com/product/schema#basic",
-              target: { table: "KPI", column: "KPI Selecionado" },
+              target: {
+                table: "KPI",
+                column: "KPI Selecionado",
+              },
               operator: "In",
-              values: [filtroKpiSelecionado],
+              values: [filtro],
               filterType: pbi.models.FilterType.Basic,
             },
           ],
         });
 
-        console.log("✅ Filtro KPI aplicado:", filtroKpiSelecionado);
         return;
-      } catch (err) {
-        console.warn("⚠️ Erro ao aplicar filtro no slicer:", err);
-      }
+      } catch {}
     }
-
-    console.warn("⚠️ Nenhum slicer KPI encontrado");
   }
 
-  // ================== RESIZE / LAYOUT ==================
+  /* ===================== RESIZE ===================== */
 
   private observeResize(container: HTMLElement) {
     if (this.resizeObserver) this.resizeObserver.disconnect();
 
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.resizeTimeout) window.clearTimeout(this.resizeTimeout);
+      if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
 
       this.resizeTimeout = window.setTimeout(() => {
         const width = container.offsetWidth;
@@ -282,23 +193,25 @@ export class PowerBIService {
     });
 
     this.resizeObserver.observe(container);
+    window.addEventListener("resize", this.handleWindowResize);
   }
 
-  private async forceResize(fromContainerResize: boolean = false) {
-    if (this.isResizing || !this.report) return;
+  private async forceResize(fromContainerResize = false) {
+    if (!this.report || this.isResizing) return;
 
     this.isResizing = true;
 
     try {
-      if (typeof (this.report as any).resize === "function") {
-        (this.report as any).resize();
-      }
+      (this.report as any).resize?.();
 
       if (fromContainerResize) {
         await new Promise((r) => setTimeout(r, 250));
       }
 
-      await this.report.updateSettings({ navContentPaneEnabled: false });
+      await this.report.updateSettings({
+        navContentPaneEnabled: false,
+      });
+
       await new Promise((r) => setTimeout(r, 120));
 
       await this.report.updateSettings({
@@ -316,19 +229,7 @@ export class PowerBIService {
     this.forceResize();
   };
 
-  public destroy(container: HTMLElement) {
-    if (this.resizeTimeout) window.clearTimeout(this.resizeTimeout);
-    if (this.resizeObserver) this.resizeObserver.disconnect();
-
-    window.removeEventListener("resize", this.handleWindowResize);
-    this.powerbi.reset(container);
-    this.destroyInternal();
-
-    this.isResizing = false;
-    this.isReportLoaded = false;
-    this.currentEmbedUrl = undefined;
-    this.currentReportId = undefined;
-  }
+  /* ===================== FULLSCREEN ===================== */
 
   public async toggleFullscreen(isFullscreen: boolean) {
     if (!this.report) return;
@@ -339,10 +240,7 @@ export class PowerBIService {
       await (this.report as any).fullscreen();
     }
 
-    setTimeout(() => {
-      this.isResizing = false;
-      this.forceResize();
-    }, 400);
+    setTimeout(() => this.forceResize(), 400);
   }
 
   public async refreshLayout() {
@@ -350,39 +248,30 @@ export class PowerBIService {
     await this.forceResize();
   }
 
-  public clearReport(containerId: string = "reportContainer") {
-    const container = document.getElementById(containerId);
+  /* ===================== LIMPEZA ===================== */
+
+  public clearReport() {
+    const container = this.getContainer();
     if (!container) return;
 
     this.powerbi.reset(container);
     container.innerHTML = "";
 
-    this.isReportLoaded = false;
-    this.currentEmbedUrl = undefined;
-    this.currentReportId = undefined;
+    this.destroyInternal();
   }
 
-  private observeContainerLifecycle(containerId: string = "reportContainer") {
-    if (this.domObserver) {
-      this.domObserver.disconnect();
-    }
+  private observeContainerLifecycle() {
+    if (this.domObserver) this.domObserver.disconnect();
 
     this.domObserver = new MutationObserver(() => {
-      const container = document.getElementById(containerId);
+      const container = this.getContainer();
 
-      // ❌ Container foi removido
       if (!container && this.isContainerMounted) {
-        console.warn(
-          "🧨 reportContainer removido do DOM — destruindo relatório"
-        );
-
         this.isContainerMounted = false;
         this.destroyInternal();
       }
 
-      // ✅ Container voltou
       if (container && !this.isContainerMounted) {
-        console.log("🔄 reportContainer remontado no DOM");
         this.isContainerMounted = true;
       }
     });
@@ -394,16 +283,14 @@ export class PowerBIService {
   }
 
   private destroyInternal() {
-    if (this.resizeTimeout) window.clearTimeout(this.resizeTimeout);
+    if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
     if (this.resizeObserver) this.resizeObserver.disconnect();
 
     window.removeEventListener("resize", this.handleWindowResize);
 
-    if (this.report) {
-      try {
-        this.report.off("loaded");
-      } catch {}
-    }
+    try {
+      this.report?.off("loaded");
+    } catch {}
 
     this.report = undefined;
     this.isResizing = false;

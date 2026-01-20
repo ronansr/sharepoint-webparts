@@ -17,7 +17,8 @@ import { PowerBIService } from "../../../services/PowerBIService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { extractReportId, filterHierarchy } from "../../../utils";
 import { TabList, Tab } from "@fluentui/react-components";
-
+import { Edit20Regular } from "@fluentui/react-icons";
+import CustomGroups from "../../CustomGroupsWebPart/components/CustomGroups";
 export interface IDashboardProps {
   context: WebPartContext;
   siteUrl: string;
@@ -61,21 +62,50 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [selectedItemLink, setSelectedItemLink] = useState<string | null>(null);
   const [selectedKpiData, setSelectedKpiData] = useState<IKpi | null>(null);
   const [menuVisible, setMenuVisible] = useState(true);
+  const [menuVisibleGroups, setMenuVisibleGroups] = useState(true);
   const [isFavoritedItem, setFavoritedItem] = useState(false);
   const [activeTab, setActiveTab] = useState<"diretrizes" | "favoritos">(
     "diretrizes"
   );
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [userGroupsMenu, setUserGroupsMenu] = useState<IGenericNode[]>([]);
+  const [selectedGroupKpiData, setSelectedGroupKpiData] = useState<IKpi | null>(
+    null
+  );
+  const [isEditingGroup, setIsEditingGroup] = useState(false);
+  const [idGrupoSelecionado, setIdGrupoSelecionado] = useState<number | null>(
+    null
+  );
+  const [groupsTab, setGroupsTab] = useState<"meus" | "compartilhados">("meus");
+  const [sharedGroupsMenu, setSharedGroupsMenu] = useState<IGenericNode[]>([]);
+  const [isGroupsReportFullscreen, setIsGroupsReportFullscreen] =
+    useState(false);
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
-  const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
+  // const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
 
-  if (!powerBIServiceRef.current) {
-    powerBIServiceRef.current = new PowerBIService();
+  // if (!powerBIServiceRef.current) {
+  //   powerBIServiceRef.current = new PowerBIService();
+  // }
+
+  // const powerBIService = powerBIServiceRef.current;
+
+  const powerBIServiceMainRef = React.useRef<PowerBIService | null>(null);
+  const powerBIServiceGroupsRef = React.useRef<PowerBIService | null>(null);
+
+  if (!powerBIServiceMainRef.current) {
+    powerBIServiceMainRef.current = new PowerBIService("reportContainerMain");
   }
 
-  const powerBIService = powerBIServiceRef.current;
+  if (!powerBIServiceGroupsRef.current) {
+    powerBIServiceGroupsRef.current = new PowerBIService(
+      "reportContainerGroups"
+    );
+  }
+
+  const powerBIServiceMain = powerBIServiceMainRef.current;
+  const powerBIServiceGroups = powerBIServiceGroupsRef.current;
 
   useEffect(() => {
     loadBaseDados();
@@ -118,6 +148,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
       window.removeEventListener("dashboard-search", handler);
     };
   }, []);
+
+  useEffect(() => {
+    if (groupsTab === "compartilhados") {
+      loadSharedGroups();
+    } else loadUserGroups();
+  }, [groupsTab]);
 
   // ------------------------------
   // Buscar BaseDados
@@ -165,6 +201,169 @@ const Dashboard: React.FC<IDashboardProps> = ({
     } catch (error) {
       console.error("Erro ao carregar favoritos", error);
       setFavoriteHierarchy([]);
+    }
+  };
+
+  const loadUserGroups = async () => {
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+
+      const gruposRaw: UsuarioListaItem[] = await sp.web.lists
+        .getByTitle("UsuarioListas")
+        .items.select("Id", "Title", "idItem", "idGrupo", "nomeGrupo", "email")
+        .filter(`email eq '${currentUserEmail}' and idGrupo ne 1`)();
+
+      if (gruposRaw.length === 0) {
+        setUserGroupsMenu([]);
+        return;
+      }
+
+      // 🔹 Agrupa por nomeGrupo
+      const grouped: Record<
+        number,
+        { nomeGrupo: string; items: UsuarioListaItem[] }
+      > = {};
+
+      gruposRaw.forEach((item) => {
+        if (!grouped[item.idGrupo]) {
+          grouped[item.idGrupo] = {
+            nomeGrupo: item.nomeGrupo!,
+            items: [],
+          };
+        }
+        grouped[item.idGrupo].items.push(item);
+      });
+
+      const menu: IGenericNode[] = Object.entries(grouped).map(
+        ([idGrupo, group]) => ({
+          id: idGrupo, // 🔑 idGrupo aqui
+          title: group.nomeGrupo,
+          showChildren: true,
+          data: { idGrupo: Number(idGrupo) },
+          children: group.items.map((i) => ({
+            id: i.idItem!,
+            title: i.Title,
+            link: i.idItem,
+            data: { idGrupo: Number(idGrupo) },
+          })),
+        })
+      );
+
+      setUserGroupsMenu(menu);
+    } catch (error) {
+      console.error("Erro ao carregar grupos do usuário", error);
+      setUserGroupsMenu([]);
+    }
+  };
+
+  const loadSharedGroups = async () => {
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+
+      const gruposRaw: UsuarioListaItem[] = await sp.web.lists
+        .getByTitle("UsuarioListas")
+        .items.select(
+          "Id",
+          "Title",
+          "idItem",
+          "idGrupo",
+          "nomeGrupo",
+          "email",
+          "privado"
+        )
+        .filter(
+          `email ne '${currentUserEmail}' and privado eq false and idGrupo ne 1`
+        )();
+
+      if (gruposRaw.length === 0) {
+        setSharedGroupsMenu([]);
+        return;
+      }
+
+      // 🔹 Agrupar por idGrupo
+      const grouped: Record<
+        number,
+        { nomeGrupo: string; items: UsuarioListaItem[] }
+      > = {};
+
+      gruposRaw.forEach((item) => {
+        if (!grouped[item.idGrupo]) {
+          grouped[item.idGrupo] = {
+            nomeGrupo: item.nomeGrupo || "Grupo compartilhado",
+            items: [],
+          };
+        }
+        grouped[item.idGrupo].items.push(item);
+      });
+
+      const menu: IGenericNode[] = Object.entries(grouped).map(
+        ([idGrupo, group]) => ({
+          id: idGrupo,
+          title: group.nomeGrupo,
+          showChildren: true,
+          data: {
+            idGrupo: Number(idGrupo),
+            shared: true, // 🔥 útil pra regras futuras
+          },
+          children: group.items.map((i) => ({
+            id: i.idItem!,
+            title: i.Title,
+            link: i.idItem,
+            data: {
+              idGrupo: Number(idGrupo),
+              shared: true,
+            },
+          })),
+        })
+      );
+
+      setSharedGroupsMenu(menu);
+    } catch (error) {
+      console.error("Erro ao carregar grupos compartilhados", error);
+      setSharedGroupsMenu([]);
+    }
+  };
+
+  const mapBaseDadosToKpi = (item: BaseDados): IKpi => {
+    return {
+      id: item.id,
+      title: item.Title,
+      link: item.link?.Url ?? "",
+      paginaRelatorioBI: item.paginaRelatorioBI,
+      filtroKpiSelecionado: item.filtroKpiSelecionado,
+      setor: item.setor,
+    };
+  };
+
+  const onSelectGroupItem = async (item: IGenericNode) => {
+    try {
+      const idGrupo = item.data?.idGrupo;
+      if (idGrupo) {
+        setIdGrupoSelecionado(idGrupo);
+      }
+
+      const result: BaseDados[] = await sp.web.lists
+        .getByTitle("BaseDados")
+        .items.filter(`id0 eq '${item.id}'`)();
+
+      if (!result.length) return;
+
+      const kpi = mapBaseDadosToKpi(result[0]);
+
+      setSelectedSector(item.id);
+      setSelectedGroupKpiData(kpi);
+
+      if (kpi.link) {
+        powerBIServiceGroups.embedReport(
+          context,
+          kpi.link,
+          extractReportId(kpi.link) ?? "",
+          kpi.paginaRelatorioBI,
+          kpi.filtroKpiSelecionado
+        );
+      }
+    } catch (error) {
+      console.error("Erro ao selecionar item do grupo", error);
     }
   };
 
@@ -399,6 +598,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const isFavorited = async (itemId: string): Promise<boolean> => {
     try {
       const currentUserEmail = context.pageContext.user.email;
+      console.log("isFavorited ", itemId);
 
       const result: UsuarioListaItem[] = await sp.web.lists
         .getByTitle("UsuarioListas")
@@ -416,7 +616,13 @@ const Dashboard: React.FC<IDashboardProps> = ({
 
   const handleToggleFullscreen = () => {
     // console.log("isFullscreen", isFullscreen);
-    powerBIService.toggleFullscreen(false);
+    powerBIServiceMain.toggleFullscreen(false);
+    // setIsFullscreen((prev) => !prev);
+  };
+
+  const handleToggleFullscreenGroups = () => {
+    // console.log("isFullscreen", isFullscreen);
+    powerBIServiceGroups.toggleFullscreen(false);
     // setIsFullscreen((prev) => !prev);
   };
   // ------------------------------
@@ -546,7 +752,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
             setSelectedSector(item.id);
             setSelectedKpiData(item.data || null);
             if (item.data?.link?.Url)
-              powerBIService.embedReport(
+              powerBIServiceMain.embedReport(
                 context,
                 item.data.link.Url,
                 extractReportId(item.data.link.Url) ?? "",
@@ -612,10 +818,10 @@ const Dashboard: React.FC<IDashboardProps> = ({
             </div>
           )}
           <div
-            id="reportContainer"
+            id="reportContainerMain"
             style={{
               flex: 1,
-              minHeight: 400,
+              minHeight: 500,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
@@ -660,7 +866,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
             setSelectedSector(item.id);
             setSelectedKpiData(item.data || null);
             if (item.data?.link?.Url)
-              powerBIService.embedReport(
+              powerBIServiceMain.embedReport(
                 context,
                 item.data.link.Url,
                 extractReportId(item.data.link.Url) ?? "",
@@ -729,10 +935,10 @@ const Dashboard: React.FC<IDashboardProps> = ({
             </div>
           )}
           <div
-            id="reportContainer"
+            id="reportContainerMain"
             style={{
               flex: 1,
-              minHeight: 400,
+              minHeight: 500,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
@@ -826,7 +1032,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
             setSelectedSector(item.id);
             setSelectedKpiData(item.data || null);
             if (item.data?.link?.Url)
-              powerBIService.embedReport(
+              powerBIServiceMain.embedReport(
                 context,
                 item.data.link.Url,
                 extractReportId(item.data.link.Url) ?? "",
@@ -897,10 +1103,10 @@ const Dashboard: React.FC<IDashboardProps> = ({
             </div>
           )}
           <div
-            id="reportContainer"
+            id="reportContainerMain"
             style={{
               flex: 1,
-              minHeight: 400,
+              minHeight: 500,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
@@ -914,6 +1120,197 @@ const Dashboard: React.FC<IDashboardProps> = ({
             )}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  const renderUserGroupsMenu = () => {
+    const hasGroups =
+      groupsTab === "meus"
+        ? userGroupsMenu.length > 0
+        : sharedGroupsMenu.length > 0;
+
+    return (
+      <div style={{ marginTop: 24 }}>
+        {/* 🔹 HEADER COM TABS + BOTÃO */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 12,
+            padding: "12px 16px",
+            background: "#f0f0f0",
+            borderRadius: 5,
+            fontWeight: 600,
+            fontSize: 16,
+          }}
+        >
+          {/* Tabs */}
+          <TabList
+            selectedValue={groupsTab}
+            onTabSelect={(e, data) =>
+              setGroupsTab(data.value as "meus" | "compartilhados")
+            }
+          >
+            <Tab value="meus">Minhas Listas</Tab>
+            <Tab value="compartilhados">Listas Compartilhadas</Tab>
+          </TabList>
+
+          {/* Botão Adicionar Grupo */}
+
+          <button
+            onClick={() => {
+              setIsEditingGroup(true);
+              setIdGrupoSelecionado(null);
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 600,
+              background: "#fff",
+              color: "#000",
+            }}
+          >
+            + Adicionar grupo
+          </button>
+        </div>
+
+        {/* 🔹 CONTEÚDO */}
+        {!hasGroups ? (
+          <div
+            style={{
+              width: "100%",
+              minHeight: 200,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#fff",
+              borderRadius: 8,
+              border: "1px dashed #ccd",
+              color: "#666",
+              fontSize: 15,
+              fontWeight: 500,
+            }}
+          >
+            {groupsTab === "meus"
+              ? "Você ainda não tem listas criadas."
+              : "Nenhuma lista compartilhada disponível."}
+          </div>
+        ) : (
+          <div style={{ display: "flex", width: "100%", gap: 5 }}>
+            <MultiLevelMenu
+              data={groupsTab === "meus" ? userGroupsMenu : sharedGroupsMenu}
+              onSelect={onSelectGroupItem}
+              menuVisible={menuVisibleGroups}
+              onToggleMenu={setMenuVisibleGroups}
+            />
+
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 0,
+              }}
+            >
+              {selectedGroupKpiData && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    background: "#f0f0f0",
+                    borderRadius: 5,
+                    fontWeight: 600,
+                    fontSize: 16,
+                    marginBottom: 8,
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <Navigation20Regular
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setMenuVisibleGroups(!menuVisibleGroups)}
+                    />
+                    <span>{selectedGroupKpiData.title}</span>
+                  </div>
+
+                  {
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      {/* Botão Tela Cheia */}
+                      <div
+                        onClick={handleToggleFullscreenGroups}
+                        title={
+                          isFullscreen ? "Sair da tela cheia" : "Tela cheia"
+                        }
+                        style={{
+                          cursor: "pointer",
+                          padding: 4,
+                          borderRadius: 6,
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        {isGroupsReportFullscreen ? (
+                          <ArrowExpand20Regular />
+                        ) : (
+                          <ArrowExpand20Regular />
+                        )}
+                      </div>
+                      {groupsTab === "meus" && (
+                        <div>
+                          <Edit20Regular
+                            style={{ cursor: "pointer" }}
+                            title="Editar grupo"
+                            onClick={() => {
+                              if (idGrupoSelecionado) {
+                                setIsEditingGroup(true);
+                              }
+                            }}
+                          />
+                          <span></span>
+                        </div>
+                      )}
+                    </div>
+                  }
+                </div>
+              )}
+
+              <div
+                id="reportContainerGroups"
+                style={{
+                  flex: 1,
+                  width: "100%",
+                  height: "100%",
+                  minHeight: 500, // 🔑 MUITO importante
+                  padding: 5,
+                  border: "1px solid #ccd",
+                  borderRadius: 8,
+                  background: "#fff",
+                  overflow: "hidden", // 🔑 Power BI gosta disso
+                  display: "flex",
+                }}
+              >
+                {!selectedItemLink && (
+                  <div style={{ color: "#666" }}>
+                    Selecione um item no menu ao lado.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -974,16 +1371,28 @@ const Dashboard: React.FC<IDashboardProps> = ({
         </>
       )}
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 16,
-          // justifyContent: "space-evenly",
-        }}
-      >
-        {getContent()}
-      </div>
+      {isEditingGroup ? (
+        <CustomGroups
+          context={context}
+          idGrupoSelecionado={idGrupoSelecionado}
+          onClose={() => {
+            setIsEditingGroup(false);
+            setIdGrupoSelecionado(null);
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+          }}
+        >
+          {getContent()}
+        </div>
+      )}
+
+      {!isEditingGroup && renderUserGroupsMenu()}
     </div>
   );
 };

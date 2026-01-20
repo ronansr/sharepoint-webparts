@@ -25,6 +25,14 @@
           "manifest": "./src/webparts/search/SearchWebPart.manifest.json"
         }
       ]
+    },
+    "custom-groups-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/CustomGroupsWebPart/CustomGroupsWebPart.js",
+          "manifest": "./src/webparts/CustomGroupsWebPart/CustomGroupsWebPart.manifest.json"
+        }
+      ]
     }
   },
   "externals": {},

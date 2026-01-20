@@ -17,7 +17,7 @@ const KpiMenu: React.FC<IKpiMenuProps> = ({
   const [kpis, setKpis] = useState<any[]>([]);
   const [selectedKpi, setSelectedKpi] = useState<any | null>(null);
 
-  const powerBIService = new PowerBIService();
+  const powerBIService = new PowerBIService("reportContainer");
 
   /** Atualiza setor */
   useEffect(() => {
