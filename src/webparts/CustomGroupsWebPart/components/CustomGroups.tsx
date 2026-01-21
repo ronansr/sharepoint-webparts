@@ -41,6 +41,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
   const sp: SPFI = spfi().using(
     SPBrowser({ baseUrl: context.pageContext.web.absoluteUrl })
   );
+  const savingRef = React.useRef(false);
 
   /* 🔄 Carregar lista existente */
   React.useEffect(() => {
@@ -76,15 +77,17 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
 
   /* 💾 Criar / salvar lista */
   const saveGroup = async (): Promise<void> => {
-    try {
-      setSaving(true);
+    if (savingRef.current) return; // 🔒 trava REAL
 
+    savingRef.current = true;
+    setSaving(true);
+
+    try {
       const email = context.pageContext.user.email;
       const name = context.pageContext.user.displayName;
       const addDate = new Date();
       const idGrupo = idGrupoSelecionado ?? generateIdGrupo();
 
-      // Se estiver editando, remove registros antigos
       if (idGrupoSelecionado) {
         await deleteGroup(false);
       }
@@ -102,15 +105,53 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
         });
       }
 
-      alert("Grupo salvo com sucesso!");
+      // alert("Grupo salvo com sucesso!");
       onClose?.();
     } catch (error) {
       console.error("Erro ao salvar lista", error);
-      alert("Erro ao salvar o lista");
+      alert("Erro ao salvar a lista");
     } finally {
+      savingRef.current = false; // 🔓 libera
       setSaving(false);
     }
   };
+
+  // const saveGroup = async (): Promise<void> => {
+  //   try {
+  //     setSaving(true);
+
+  //     const email = context.pageContext.user.email;
+  //     const name = context.pageContext.user.displayName;
+  //     const addDate = new Date();
+  //     const idGrupo = idGrupoSelecionado ?? generateIdGrupo();
+
+  //     // Se estiver editando, remove registros antigos
+  //     if (idGrupoSelecionado) {
+  //       await deleteGroup(false);
+  //     }
+
+  //     for (const item of selectedItems) {
+  //       await sp.web.lists.getByTitle("UsuarioListas").items.add({
+  //         Title: item.title,
+  //         email,
+  //         addDate,
+  //         privado: !isPublic,
+  //         nomeGrupo: groupName,
+  //         idGrupo,
+  //         idItem: item.idItem,
+  //         nomeAutor: name,
+  //       });
+  //     }
+
+  //     alert("Grupo salvo com sucesso!");
+  //     onClose?.();
+  //   } catch (error) {
+  //     console.error("Erro ao salvar lista", error);
+  //     alert("Erro ao salvar o lista");
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
 
   /* 🗑 Excluir lista */
   const deleteGroup = async (showConfirm = true): Promise<void> => {
@@ -141,7 +182,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
           .delete();
       }
 
-      alert("Grupo excluído com sucesso!");
+      // alert("Grupo excluído com sucesso!");
       onClose?.();
     } catch (error) {
       console.error("Erro ao excluir lista", error);

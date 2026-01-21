@@ -153,7 +153,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
     if (groupsTab === "compartilhados") {
       loadSharedGroups();
     } else loadUserGroups();
-  }, [groupsTab]);
+  }, [groupsTab, isEditingGroup]);
 
   // ------------------------------
   // Buscar BaseDados
@@ -762,6 +762,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
           }}
           menuVisible={menuVisible}
           onToggleMenu={setMenuVisible}
+          showToggleOnlyValidates
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           {selectedKpiData && (
@@ -876,6 +877,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
           }}
           menuVisible={menuVisible}
           onToggleMenu={setMenuVisible}
+          showToggleOnlyValidates
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           {selectedKpiData && (
@@ -1043,6 +1045,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
           menuVisible={menuVisible}
           onToggleMenu={setMenuVisible}
           expandAll
+          showToggleOnlyValidates
           // hideSearch
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -1149,9 +1152,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
           {/* Tabs */}
           <TabList
             selectedValue={groupsTab}
-            onTabSelect={(e, data) =>
-              setGroupsTab(data.value as "meus" | "compartilhados")
-            }
+            onTabSelect={(e, data) => {
+              setGroupsTab(data.value as "meus" | "compartilhados");
+
+              setMenuVisibleGroups(true);
+              setSelectedGroupKpiData(null);
+            }}
           >
             <Tab value="meus">Minhas Listas</Tab>
             <Tab value="compartilhados">Listas Compartilhadas</Tab>
@@ -1353,22 +1359,24 @@ const Dashboard: React.FC<IDashboardProps> = ({
           Resultado da pesquisa "{searchText}"
         </div>
       ) : (
-        <>
-          {/* 🧭 Tabs normais */}
-          <TabList
-            selectedValue={activeTab}
-            onTabSelect={(e, data) =>
-              setActiveTab(data.value as "diretrizes" | "favoritos")
-            }
-            style={{ marginBottom: 10 }}
-          >
-            <Tab value="diretrizes">Diretrizes</Tab>
-            <Tab value="favoritos">Favoritos</Tab>
-          </TabList>
+        !isEditingGroup && (
+          <>
+            {/* 🧭 Tabs normais */}
+            <TabList
+              selectedValue={activeTab}
+              onTabSelect={(e, data) => {
+                setActiveTab(data.value as "diretrizes" | "favoritos");
+              }}
+              style={{ marginBottom: 10 }}
+            >
+              <Tab value="diretrizes">Diretrizes</Tab>
+              <Tab value="favoritos">Favoritos</Tab>
+            </TabList>
 
-          {/* 🧱 Breadcrumb só fora da busca */}
-          {activeTab === "diretrizes" && renderBreadcrumb()}
-        </>
+            {/* 🧱 Breadcrumb só fora da busca */}
+            {activeTab === "diretrizes" && renderBreadcrumb()}
+          </>
+        )
       )}
 
       {isEditingGroup ? (
@@ -1376,8 +1384,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
           context={context}
           idGrupoSelecionado={idGrupoSelecionado}
           onClose={() => {
-            setIsEditingGroup(false);
+            setMenuVisibleGroups(true);
             setIdGrupoSelecionado(null);
+            setSelectedGroupKpiData(null);
+            setTimeout(() => {
+              setIsEditingGroup(false);
+            }, 1000);
           }}
         />
       ) : (
@@ -1392,7 +1404,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         </div>
       )}
 
-      {!isEditingGroup && renderUserGroupsMenu()}
+      {!isEditingGroup && !isSearching && renderUserGroupsMenu()}
     </div>
   );
 };

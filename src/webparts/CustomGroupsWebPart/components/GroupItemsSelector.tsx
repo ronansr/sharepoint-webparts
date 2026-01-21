@@ -61,7 +61,15 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
       // .items.select("Id", "Title", "esconderNoMenu", "id")();
       .items();
 
-    setItems(data.filter((i) => !i.esconderNoMenu));
+    setItems(
+      data.filter(
+        (i) =>
+          !i.esconderNoMenu &&
+          i.link && // existe
+          i.link.Url && // tem URL
+          i.link.Url.trim() !== ""
+      )
+    );
   };
 
   /* ⭐ Favoritos */

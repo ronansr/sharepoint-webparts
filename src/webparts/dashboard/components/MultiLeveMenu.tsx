@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ChevronRight20Filled,
   ChevronDown20Filled,
   Search20Regular,
   CheckmarkCircle20Filled,
 } from "@fluentui/react-icons";
+import { Toggle } from "@fluentui/react";
 import { normalizeText } from "../../../utils";
 
 export interface IGenericNode {
@@ -12,6 +13,7 @@ export interface IGenericNode {
   title: string;
   link?: string;
   children?: IGenericNode[];
+  showChildren?: boolean;
   data?: any;
   // data?: {
   //   kpiValidado?: boolean;
@@ -19,7 +21,6 @@ export interface IGenericNode {
   //   menuVisible?: boolean;
   //   [key: string]: any;
   // };
-  showChildren?: boolean;
 }
 
 interface IMultiLevelMenuProps {
@@ -29,11 +30,10 @@ interface IMultiLevelMenuProps {
   onToggleMenu?: (visible: boolean) => void;
   hideSearch?: boolean;
   expandAll?: boolean;
+  showToggleOnlyValidates?: boolean;
 }
 
-/**
- * 🔒 Regra única de visibilidade no menu
- */
+/** 🔒 Visibilidade base */
 const isHiddenInMenu = (node: IGenericNode) =>
   node.data?.esconderNoMenu === true || node.data?.menuVisible === false;
 
@@ -44,11 +44,13 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
   onToggleMenu,
   hideSearch,
   expandAll,
+  showToggleOnlyValidates,
 }) => {
   const [expanded, setExpanded] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(true);
+  const [onlyValidated, setOnlyValidated] = useState(false);
 
   const isMenuOpen =
     expandAll === true
@@ -57,202 +59,129 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
       ? menuVisible
       : menuOpen;
 
-  React.useEffect(() => {
-    if (expandAll) {
-      const allIds = getAllExpandableIds(data);
-      setExpanded(allIds);
-    }
-  }, [expandAll, data]);
-
-  const toggleMenu = () => {
-    if (onToggleMenu) {
-      onToggleMenu(!isMenuOpen);
-    } else {
-      setMenuOpen((prev) => !prev);
-    }
-  };
-
-  const toggle = (id: string) => {
-    setExpanded((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
+  /** 🔓 IDs expansíveis */
   const getAllExpandableIds = (nodes: IGenericNode[]): string[] => {
     let ids: string[] = [];
-
     for (const node of nodes) {
-      if (node.children?.length && !isHiddenInMenu(node)) {
+      if (node.children?.length) {
         ids.push(node.id);
         ids = ids.concat(getAllExpandableIds(node.children));
       }
     }
-
     return ids;
   };
 
-  /**
-   * 🌳 Filtro hierárquico respeitando esconderNoMenu / menuVisible
-   */
+  /** 🌳 FILTRO FINAL CORRETO */
   const filterTree = (nodes: IGenericNode[], q: string): IGenericNode[] => {
     const query = normalizeText(q);
-    const result: IGenericNode[] = [];
 
-    for (const node of nodes) {
-      // 🚫 Nunca exibe itens ocultos
-      if (isHiddenInMenu(node)) continue;
+    return nodes.reduce<IGenericNode[]>((acc, node) => {
+      if (isHiddenInMenu(node)) return acc;
 
       const filteredChildren = node.children
         ? filterTree(node.children, q)
         : [];
 
-      // Sem busca → só respeita visibilidade
-      if (!q.trim()) {
-        result.push({
-          ...node,
-          children: filteredChildren,
-        });
-        continue;
+      const isGroup = !!node.children?.length;
+      const isValidated = node.data?.kpiValidado === true;
+
+      // 🔐 KPI não validado some
+      if (onlyValidated && !isGroup && !isValidated) {
+        return acc;
       }
 
-      const titleMatch = normalizeText(node.title).includes(query);
-      const dataTitleMatch = normalizeText(node.data?.Title).includes(query);
-      const childMatch = filteredChildren.length > 0;
-
-      if (titleMatch || dataTitleMatch || childMatch) {
-        result.push({
-          ...node,
-          children: filteredChildren,
-          showChildren: true,
-        });
+      // 🔐 Grupo só entra se tiver filhos válidos
+      if (onlyValidated && isGroup && filteredChildren.length === 0) {
+        return acc;
       }
-    }
 
-    return result;
-  };
+      // 🔍 Busca
+      if (q.trim()) {
+        const titleMatch = normalizeText(node.title).includes(query);
+        if (!titleMatch && filteredChildren.length === 0) {
+          return acc;
+        }
+      }
 
-  const filteredData = useMemo(() => filterTree(data, search), [data, search]);
-
-  /**
-   * 🧱 Render com blindagem final
-   */
-  const renderTree = (nodes: IGenericNode[], level = 0) =>
-    nodes
-      .filter((node) => !isHiddenInMenu(node))
-      .map((node) => {
-        const isOpen = expanded.includes(node.id);
-        const hasChildren =
-          !!node.children?.length && node.showChildren !== false;
-        const isSelected = selected === node.id;
-        const isSelectable = !!node.link;
-
-        return (
-          <div key={node.id} style={{ marginBottom: 2 }}>
-            <div
-              onClick={() => {
-                if (isSelectable) {
-                  setSelected(node.id);
-                  onSelect(node);
-                } else if (hasChildren) {
-                  toggle(node.id);
-                }
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) e.currentTarget.style.background = "#F2F2F2";
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected)
-                  e.currentTarget.style.background = "transparent";
-              }}
-              style={{
-                cursor: "pointer",
-                padding: "8px 10px",
-                marginLeft: level === 0 ? 0 : level * 12,
-                borderRadius: 4,
-                fontWeight: level === 0 ? 600 : 400,
-                fontSize: level === 0 ? 15 : 14,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: isSelected ? "#A32828" : "transparent",
-                color: isSelected ? "#fff" : "#4A4A4A",
-                transition: "background 0.15s ease",
-              }}
-            >
-              {/* TEXTO → SELECIONA */}
-              <span>{node.title}</span>
-              {node?.data?.kpiValidado ? (
-                <CheckmarkCircle20Filled color={"#2e7d32"} />
-              ) : (
-                <></>
-              )}
-
-              {/* CHEVRON → EXPANDE */}
-              {hasChildren && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation(); // 🔒 não dispara seleção
-                    toggle(node.id);
-                  }}
-                  style={{
-                    marginLeft: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  {isOpen ? (
-                    <ChevronDown20Filled
-                      color={isSelected ? "white" : "black"}
-                    />
-                  ) : (
-                    <ChevronRight20Filled
-                      color={isSelected ? "white" : "black"}
-                    />
-                  )}
-                </span>
-              )}
-            </div>
-
-            {hasChildren && (
-              <div
-                style={{
-                  maxHeight: isOpen ? 1000 : 0, // valor alto para comportar os filhos
-                  overflow: "hidden",
-                  transition: "max-height 0.3s ease",
-                  marginTop: isOpen ? 4 : 0,
-                }}
-              >
-                <div
-                  style={{
-                    opacity: isOpen ? 1 : 0,
-                    transition: "opacity 0.3s ease",
-                  }}
-                >
-                  {renderTree(node.children ?? [], level + 1)}
-                </div>
-              </div>
-            )}
-          </div>
-        );
+      acc.push({
+        ...node,
+        children: filteredChildren,
       });
 
+      return acc;
+    }, []);
+  };
+
+  const filteredData = useMemo(
+    () => filterTree(data, search),
+    [data, search, onlyValidated]
+  );
+
+  /** 🔄 Expansão SEMPRE consistente */
+  useEffect(() => {
+    setExpanded(getAllExpandableIds(filteredData));
+  }, [filteredData]);
+
+  /** 🧱 Renderização */
+  const renderTree = (nodes: IGenericNode[], level = 0) =>
+    nodes.map((node) => {
+      const isOpen = expanded.includes(node.id);
+      const hasChildren = !!node.children?.length;
+      const isSelected = selected === node.id;
+
+      return (
+        <div key={node.id}>
+          <div
+            onClick={() => {
+              if (node.link) {
+                setSelected(node.id);
+                onSelect(node);
+              } else if (hasChildren) {
+                setExpanded((p) =>
+                  p.includes(node.id)
+                    ? p.filter((x) => x !== node.id)
+                    : [...p, node.id]
+                );
+              }
+            }}
+            style={{
+              cursor: "pointer",
+              padding: "8px 10px",
+              marginLeft: level * 12,
+              borderRadius: 4,
+              fontWeight: level === 0 ? 600 : 400,
+              display: "flex",
+              justifyContent: "space-between",
+              background: isSelected ? "#A32828" : "transparent",
+              color: isSelected ? "#fff" : "#4A4A4A",
+            }}
+          >
+            <span>{node.title}</span>
+
+            {node.data?.kpiValidado && (
+              <CheckmarkCircle20Filled color="#2e7d32" />
+            )}
+
+            {hasChildren &&
+              (isOpen ? <ChevronDown20Filled /> : <ChevronRight20Filled />)}
+          </div>
+
+          {hasChildren && isOpen && renderTree(node.children!, level + 1)}
+        </div>
+      );
+    });
+
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div
-        style={{
-          width: isMenuOpen ? 320 : 0,
-          opacity: isMenuOpen ? 1 : 0,
-          padding: isMenuOpen ? 20 : 0,
-          overflow: "hidden",
-          border: isMenuOpen ? "1px solid #ddd" : "none",
-          borderRadius: isMenuOpen ? 5 : 0,
-          background: "#f0f0f0",
-          boxSizing: "border-box",
-          transition: "all 0.3s ease",
-        }}
-      >
-        {!hideSearch && (
+    <div
+      style={{
+        width: isMenuOpen ? 320 : 0,
+        padding: isMenuOpen ? 16 : 0,
+        background: "#f0f0f0",
+        transition: "all 0.3s ease",
+      }}
+    >
+      {!hideSearch && (
+        <>
           <div
             style={{
               width: "100%",
@@ -282,10 +211,19 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
 
             <Search20Regular color="#333" />
           </div>
-        )}
 
-        {renderTree(filteredData)}
-      </div>
+          {showToggleOnlyValidates && (
+            <Toggle
+              label="Mostrar apenas validados"
+              checked={onlyValidated}
+              inlineLabel
+              onChange={(_, v) => setOnlyValidated(!!v)}
+            />
+          )}
+        </>
+      )}
+
+      {renderTree(filteredData)}
     </div>
   );
 };
