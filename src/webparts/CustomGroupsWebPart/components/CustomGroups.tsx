@@ -29,6 +29,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
   onClose,
 }) => {
   const [groupName, setGroupName] = React.useState("");
+  const [groupDescription, setGroupDescription] = React.useState(""); // 🆕 descrição
   const [isPublic, setIsPublic] = React.useState(true);
   const [selectedItems, setSelectedItems] = React.useState<
     ISelectedGroupItem[]
@@ -57,11 +58,18 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
       const items = await sp.web.lists
         .getByTitle("UsuarioListas")
         .items.filter(`email eq '${email}' and idGrupo eq ${idGrupo}`)
-        .select("Title", "idItem", "privado", "nomeGrupo")();
+        .select(
+          "Title",
+          "idItem",
+          "privado",
+          "nomeGrupo",
+          "descricao" // 🆕
+        )();
 
       if (!items.length) return;
 
       setGroupName(items[0].nomeGrupo);
+      setGroupDescription(items[0].descricao ?? ""); // 🆕
       setIsPublic(!items[0].privado);
 
       setSelectedItems(
@@ -77,7 +85,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
 
   /* 💾 Criar / salvar lista */
   const saveGroup = async (): Promise<void> => {
-    if (savingRef.current) return; // 🔒 trava REAL
+    if (savingRef.current) return;
 
     savingRef.current = true;
     setSaving(true);
@@ -99,59 +107,24 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
           addDate,
           privado: !isPublic,
           nomeGrupo: groupName,
+          descricao: groupDescription, // 🆕
           idGrupo,
           idItem: item.idItem,
           nomeAutor: name,
         });
       }
 
-      // alert("Grupo salvo com sucesso!");
-      onClose?.();
+      setTimeout(() => {
+        onClose?.();
+      }, 2000);
     } catch (error) {
       console.error("Erro ao salvar lista", error);
       alert("Erro ao salvar a lista");
     } finally {
-      savingRef.current = false; // 🔓 libera
+      savingRef.current = false;
       setSaving(false);
     }
   };
-
-  // const saveGroup = async (): Promise<void> => {
-  //   try {
-  //     setSaving(true);
-
-  //     const email = context.pageContext.user.email;
-  //     const name = context.pageContext.user.displayName;
-  //     const addDate = new Date();
-  //     const idGrupo = idGrupoSelecionado ?? generateIdGrupo();
-
-  //     // Se estiver editando, remove registros antigos
-  //     if (idGrupoSelecionado) {
-  //       await deleteGroup(false);
-  //     }
-
-  //     for (const item of selectedItems) {
-  //       await sp.web.lists.getByTitle("UsuarioListas").items.add({
-  //         Title: item.title,
-  //         email,
-  //         addDate,
-  //         privado: !isPublic,
-  //         nomeGrupo: groupName,
-  //         idGrupo,
-  //         idItem: item.idItem,
-  //         nomeAutor: name,
-  //       });
-  //     }
-
-  //     alert("Grupo salvo com sucesso!");
-  //     onClose?.();
-  //   } catch (error) {
-  //     console.error("Erro ao salvar lista", error);
-  //     alert("Erro ao salvar o lista");
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
 
   /* 🗑 Excluir lista */
   const deleteGroup = async (showConfirm = true): Promise<void> => {
@@ -182,7 +155,6 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
           .delete();
       }
 
-      // alert("Grupo excluído com sucesso!");
       onClose?.();
     } catch (error) {
       console.error("Erro ao excluir lista", error);
@@ -213,9 +185,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
         análise dos dados.
       </Text>
 
-      {/* 🏷 Nome */}
-
-      {/* 👁 Visibilidade */}
+      {/* 🏷 Nome + Visibilidade */}
       <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 12 }}>
         <input
           placeholder="Nome da lista"
@@ -229,13 +199,28 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
             width: 300,
           }}
         />
+
         <Toggle
-          label="Público"
+          label="Visível para todos"
           inlineLabel
           checked={isPublic}
           onChange={(_, checked) => setIsPublic(!!checked)}
         />
       </Stack>
+
+      {/* 🆕 Descrição */}
+      <input
+        placeholder="Descrição da lista"
+        value={groupDescription}
+        onChange={(e) => setGroupDescription(e.target.value)}
+        style={{
+          padding: 10,
+          borderRadius: 4,
+          border: "1px solid #ccc",
+          fontSize: 14,
+          width: "100%",
+        }}
+      />
 
       {/* 🔍 Pesquisa */}
       <Stack horizontal horizontalAlign="space-between" verticalAlign="center">

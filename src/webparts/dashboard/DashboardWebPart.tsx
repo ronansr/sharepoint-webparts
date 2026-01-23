@@ -4,8 +4,11 @@ import * as React from "react";
 import * as ReactDom from "react-dom";
 import Dashboard from "./components/Dashboard";
 // import { IDynamicDataCallables } from "@microsoft/sp-dynamic-data";
+import { PropertyPaneToggle } from "@microsoft/sp-property-pane";
 
-export interface IDashboardWebPartProps {}
+export interface IDashboardWebPartProps {
+  enableCleanLayout: boolean;
+}
 
 export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWebPartProps> {
   // implements IDDynamicDataCallables
@@ -13,6 +16,7 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
 
   protected onInit(): Promise<void> {
     this.context.dynamicDataSourceManager.initializeSource(this);
+    this.properties.enableCleanLayout ??= false;
     return super.onInit();
   }
 
@@ -33,11 +37,36 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
     );
   }
 
+  protected getPropertyPaneConfiguration() {
+    return {
+      pages: [
+        {
+          header: {
+            description: "Configurações do Dashboard",
+          },
+          groups: [
+            {
+              groupName: "Layout",
+              groupFields: [
+                PropertyPaneToggle("enableCleanLayout", {
+                  label: "Modo tela limpa",
+                  onText: "Ativado",
+                  offText: "Desativado",
+                }),
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
   public render(): void {
     const element = React.createElement(Dashboard, {
       siteUrl: this.context.pageContext.web.absoluteUrl,
       setSelectedSector: this.setSelectedSectorValue.bind(this),
       context: this.context,
+      enableCleanLayout: this.properties.enableCleanLayout,
     });
 
     ReactDom.render(element, this.domElement);

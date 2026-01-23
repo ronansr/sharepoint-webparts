@@ -1,9 +1,14 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   ChevronRight20Filled,
   ChevronDown20Filled,
   Search20Regular,
   CheckmarkCircle20Filled,
+  Edit20Regular,
+  Star20Regular,
+  Star20Filled,
+  Pin20Filled,
+  Pin20Regular,
 } from "@fluentui/react-icons";
 import { Toggle } from "@fluentui/react";
 import { normalizeText } from "../../../utils";
@@ -15,12 +20,7 @@ export interface IGenericNode {
   children?: IGenericNode[];
   showChildren?: boolean;
   data?: any;
-  // data?: {
-  //   kpiValidado?: boolean;
-  //   esconderNoMenu?: boolean;
-  //   menuVisible?: boolean;
-  //   [key: string]: any;
-  // };
+  iconComponent?: React.ReactNode;
 }
 
 interface IMultiLevelMenuProps {
@@ -31,6 +31,10 @@ interface IMultiLevelMenuProps {
   hideSearch?: boolean;
   expandAll?: boolean;
   showToggleOnlyValidates?: boolean;
+  onPressEditItemGroup?: (id: any) => void | null;
+  onPressStarItemGroup?: (id: any) => void;
+  /** 🆕 Controle de expansão inicial */
+  initialExpanded?: "open" | "closed";
 }
 
 /** 🔒 Visibilidade base */
@@ -45,12 +49,18 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
   hideSearch,
   expandAll,
   showToggleOnlyValidates,
+  onPressEditItemGroup,
+  onPressStarItemGroup,
+  initialExpanded = "open",
 }) => {
   const [expanded, setExpanded] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(true);
   const [onlyValidated, setOnlyValidated] = useState(false);
+
+  /** 🔐 Garante que a lógica inicial rode só uma vez */
+  const hasInitializedExpansion = useRef(false);
 
   const isMenuOpen =
     expandAll === true
@@ -60,18 +70,24 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
       : menuOpen;
 
   /** 🔓 IDs expansíveis */
-  const getAllExpandableIds = (nodes: IGenericNode[]): string[] => {
+  const getAllExpandableIds = (
+    nodes: IGenericNode[],
+    parentPath = ""
+  ): string[] => {
     let ids: string[] = [];
+
     for (const node of nodes) {
       if (node.children?.length) {
-        ids.push(node.id);
-        ids = ids.concat(getAllExpandableIds(node.children));
+        const key = `${parentPath}/${node.id}`;
+        ids.push(key);
+        ids = ids.concat(getAllExpandableIds(node.children, key));
       }
     }
+
     return ids;
   };
 
-  /** 🌳 FILTRO FINAL CORRETO */
+  /** 🌳 FILTRO FINAL */
   const filterTree = (nodes: IGenericNode[], q: string): IGenericNode[] => {
     const query = normalizeText(q);
 
@@ -85,22 +101,12 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
       const isGroup = !!node.children?.length;
       const isValidated = node.data?.kpiValidado === true;
 
-      // 🔐 KPI não validado some
-      if (onlyValidated && !isGroup && !isValidated) {
-        return acc;
-      }
+      if (onlyValidated && !isGroup && !isValidated) return acc;
+      if (onlyValidated && isGroup && filteredChildren.length === 0) return acc;
 
-      // 🔐 Grupo só entra se tiver filhos válidos
-      if (onlyValidated && isGroup && filteredChildren.length === 0) {
-        return acc;
-      }
-
-      // 🔍 Busca
       if (q.trim()) {
         const titleMatch = normalizeText(node.title).includes(query);
-        if (!titleMatch && filteredChildren.length === 0) {
-          return acc;
-        }
+        if (!titleMatch && filteredChildren.length === 0) return acc;
       }
 
       acc.push({
@@ -117,15 +123,26 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
     [data, search, onlyValidated]
   );
 
-  /** 🔄 Expansão SEMPRE consistente */
+  /** 🆕 Expansão inicial controlada por prop */
   useEffect(() => {
-    setExpanded(getAllExpandableIds(filteredData));
-  }, [filteredData]);
+    if (hasInitializedExpansion.current) return;
+
+    if (initialExpanded === "open") {
+      setExpanded(getAllExpandableIds(filteredData));
+    } else {
+      setExpanded([]);
+    }
+
+    hasInitializedExpansion.current = true;
+  }, [filteredData, initialExpanded]);
 
   /** 🧱 Renderização */
-  const renderTree = (nodes: IGenericNode[], level = 0) =>
+  const renderTree = (nodes: IGenericNode[], level = 0, parentPath = "") =>
     nodes.map((node) => {
-      const isOpen = expanded.includes(node.id);
+      const expansionKey = `${parentPath}/${node.id}`;
+
+      const isOpen = expanded.includes(expansionKey);
+      // const isOpen = expanded.includes(node.id);
       const hasChildren = !!node.children?.length;
       const isSelected = selected === node.id;
 
@@ -138,9 +155,9 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
                 onSelect(node);
               } else if (hasChildren) {
                 setExpanded((p) =>
-                  p.includes(node.id)
-                    ? p.filter((x) => x !== node.id)
-                    : [...p, node.id]
+                  p.includes(expansionKey)
+                    ? p.filter((x) => x !== expansionKey)
+                    : [...p, expansionKey]
                 );
               }
             }}
@@ -152,21 +169,65 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
               fontWeight: level === 0 ? 600 : 400,
               display: "flex",
               justifyContent: "space-between",
+              alignItems: "center",
               background: isSelected ? "#A32828" : "transparent",
               color: isSelected ? "#fff" : "#4A4A4A",
             }}
           >
-            <span>{node.title}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {node?.data?.iconComponent && node?.data?.iconComponent}
+              <span>{node.title}</span>
+            </div>
 
-            {node.data?.kpiValidado && (
-              <CheckmarkCircle20Filled color="#2e7d32" />
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {node.data?.kpiValidado && (
+                <CheckmarkCircle20Filled color="#2e7d32" />
+              )}
 
-            {hasChildren &&
-              (isOpen ? <ChevronDown20Filled /> : <ChevronRight20Filled />)}
+              {onPressStarItemGroup &&
+                hasChildren &&
+                node.data?.hideStar !== true && (
+                  <>
+                    {node.data?.isFavorited ? (
+                      <Pin20Filled
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPressStarItemGroup(node.id);
+                        }}
+                        style={{
+                          color: "black",
+                        }}
+                      />
+                    ) : (
+                      <Pin20Regular
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPressStarItemGroup(node.id);
+                        }}
+                        style={{
+                          color: "gray",
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              {onPressEditItemGroup && hasChildren && (
+                <Edit20Regular
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPressEditItemGroup(node.id);
+                  }}
+                />
+              )}
+
+              {hasChildren &&
+                (isOpen ? <ChevronDown20Filled /> : <ChevronRight20Filled />)}
+            </div>
           </div>
 
-          {hasChildren && isOpen && renderTree(node.children!, level + 1)}
+          {hasChildren &&
+            isOpen &&
+            renderTree(node.children!, level + 1, expansionKey)}
         </div>
       );
     });
@@ -178,9 +239,13 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
         padding: isMenuOpen ? 16 : 0,
         background: "#f0f0f0",
         transition: "all 0.3s ease",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        // minHeight: 500, // ✅ altura mínima do menu
       }}
     >
-      {!hideSearch && (
+      {!hideSearch && isMenuOpen && (
         <>
           <div
             style={{
@@ -194,6 +259,8 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
               background: "#FFF",
               boxSizing: "border-box",
               gap: 8,
+
+              flexShrink: 0,
             }}
           >
             <input
@@ -223,7 +290,16 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
         </>
       )}
 
-      {renderTree(filteredData)}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          // minHeight: 500, // ✅ garante scroll mesmo sem flex pai externo
+          paddingRight: 4, // evita corte da scrollbar
+        }}
+      >
+        {renderTree(filteredData)}
+      </div>
     </div>
   );
 };

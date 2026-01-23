@@ -11,6 +11,7 @@ import {
   Navigation20Regular,
   Star20Filled,
   ArrowExpand20Regular,
+  Library20Regular,
 } from "@fluentui/react-icons";
 import MultiLevelMenu, { IGenericNode } from "./MultiLeveMenu";
 import { PowerBIService } from "../../../services/PowerBIService";
@@ -19,10 +20,14 @@ import { extractReportId, filterHierarchy } from "../../../utils";
 import { TabList, Tab } from "@fluentui/react-components";
 import { Edit20Regular } from "@fluentui/react-icons";
 import CustomGroups from "../../CustomGroupsWebPart/components/CustomGroups";
+import { Info20Regular } from "@fluentui/react-icons";
+import { TooltipHost } from "@fluentui/react";
+
 export interface IDashboardProps {
   context: WebPartContext;
   siteUrl: string;
   setSelectedSector: (sectorId: string) => void;
+  enableCleanLayout: boolean;
 }
 
 // Tipos
@@ -46,13 +51,18 @@ export interface UsuarioListaItem {
   idGrupo: number;
   nomeGrupo?: string;
   email: string;
+  nomeAutor?: string;
+  descricao?: string;
+  updateDate?: string;
 }
 
 const Dashboard: React.FC<IDashboardProps> = ({
   context,
   siteUrl,
   setSelectedSector,
+  enableCleanLayout,
 }) => {
+  const [baseDadosData, setBaseDadosData] = useState<BaseDados[]>([]);
   const [hierarchy, setHierarchy] = useState<IDiretriz[]>([]);
   const [favoriteHierarchy, setFavoriteHierarchy] = useState<IDiretriz[]>([]);
   const [selectedDiretriz, setSelectedDiretriz] = useState<IDiretriz | null>(
@@ -64,9 +74,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [menuVisible, setMenuVisible] = useState(true);
   const [menuVisibleGroups, setMenuVisibleGroups] = useState(true);
   const [isFavoritedItem, setFavoritedItem] = useState(false);
-  const [activeTab, setActiveTab] = useState<"diretrizes" | "favoritos">(
-    "diretrizes"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "diretrizes" | "favoritos" | "listas"
+  >("diretrizes");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [userGroupsMenu, setUserGroupsMenu] = useState<IGenericNode[]>([]);
@@ -134,6 +144,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
     //   powerBIService.toggleFullscreen(true);
     //   setIsFullscreen(false);
     // }
+
+    powerBIServiceMain.clearReport();
+    powerBIServiceGroups.clearReport();
   }, [activeTab]);
 
   useEffect(() => {
@@ -153,7 +166,66 @@ const Dashboard: React.FC<IDashboardProps> = ({
     if (groupsTab === "compartilhados") {
       loadSharedGroups();
     } else loadUserGroups();
-  }, [groupsTab, isEditingGroup]);
+  }, [groupsTab, isEditingGroup, baseDadosData]);
+
+  useEffect(() => {
+    const styleId = "dashboard-clean-layout-style";
+
+    // Remove se existir
+    const existing = document.getElementById(styleId);
+    if (existing) existing.remove();
+
+    if (!enableCleanLayout) return;
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.innerHTML = `
+    /* 🔴 Header Microsoft */
+    #SuiteNavWrapper,
+    #suiteBarDelta {
+      display: none !important;
+    }
+
+    /* 🔵 Header do site */
+    #spSiteHeader,
+    .ms-compositeHeader {
+      display: none !important;
+    }
+
+    /* 🟣 Menu lateral */
+    #spLeftNav,
+    #sp-appBar,
+    #spLeftNavContainer {
+      display: none !important;
+    }
+
+    /* 🟡 Command bar */
+    #spCommandBar {
+      display: none !important;
+    }
+
+    /* 🟢 Conteúdo full width */
+    #contentBox,
+    #workbenchPageContent,
+    .CanvasZone,
+    .CanvasSection,
+    .CanvasZoneContainer {
+      margin-left: 0 !important;
+      max-width: 100% !important;
+    }
+
+    #s4-workspace,
+    #mainContent {
+      margin-top: 0 !important;
+    }
+  `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, [enableCleanLayout]);
 
   // ------------------------------
   // Buscar BaseDados
@@ -163,7 +235,12 @@ const Dashboard: React.FC<IDashboardProps> = ({
       const items: BaseDados[] = await sp.web.lists
         .getByTitle("BaseDados")
         .items();
-      const structured = groupByHierarchy(items.filter((item) => item.status));
+
+      const itemsOk = items.filter((item) => item.status);
+      setBaseDadosData(itemsOk);
+
+      console.log("itemsOk", itemsOk);
+      const structured = groupByHierarchy(itemsOk);
       setHierarchy(structured);
     } catch (error) {
       console.error("Erro ao buscar BaseDados", error);
@@ -211,7 +288,9 @@ const Dashboard: React.FC<IDashboardProps> = ({
       const gruposRaw: UsuarioListaItem[] = await sp.web.lists
         .getByTitle("UsuarioListas")
         .items.select("Id", "Title", "idItem", "idGrupo", "nomeGrupo", "email")
-        .filter(`email eq '${currentUserEmail}' and idGrupo ne 1`)();
+        .filter(
+          `email eq '${currentUserEmail}' and idGrupo ne 1 and idGrupo ne 2`
+        )();
 
       if (gruposRaw.length === 0) {
         setUserGroupsMenu([]);
@@ -233,6 +312,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         }
         grouped[item.idGrupo].items.push(item);
       });
+      console.log(baseDadosData);
 
       const menu: IGenericNode[] = Object.entries(grouped).map(
         ([idGrupo, group]) => ({
@@ -244,11 +324,14 @@ const Dashboard: React.FC<IDashboardProps> = ({
             id: i.idItem!,
             title: i.Title,
             link: i.idItem,
-            data: { idGrupo: Number(idGrupo) },
+            data: {
+              idGrupo: Number(idGrupo),
+              ...baseDadosData?.find((item) => item.id0 === i.idItem),
+            },
           })),
         })
       );
-
+      console.log(menu);
       setUserGroupsMenu(menu);
     } catch (error) {
       console.error("Erro ao carregar grupos do usuário", error);
@@ -256,10 +339,47 @@ const Dashboard: React.FC<IDashboardProps> = ({
     }
   };
 
+  const loadFavoriteSharedGroups = async (): Promise<string[]> => {
+    const currentUserEmail = context.pageContext.user.email;
+
+    const items: UsuarioListaItem[] = await sp.web.lists
+      .getByTitle("UsuarioListas")
+      .items.select("idItem")
+      .filter(`email eq '${currentUserEmail}' and idGrupo eq 2`)();
+
+    return Array.from(
+      new Set(
+        items
+          .map((i) => i.idItem)
+          .filter((id): id is string => typeof id === "string")
+      )
+    );
+  };
+
+  const buildInfoIcon = (
+    nomeAutor?: string,
+    email?: string,
+    descricao?: string,
+    updateDate?: string
+  ) => {
+    const message = `Lista criada por ${nomeAutor ?? "-"} (${email ?? "-"}).
+Descrição: ${descricao ?? "Sem descrição"}.
+Última atualização: ${
+      updateDate ? new Date(updateDate).toLocaleString() : "-"
+    }`;
+
+    return (
+      <TooltipHost content={message}>
+        <Info20Regular style={{ cursor: "pointer", color: "#666" }} />
+      </TooltipHost>
+    );
+  };
+
   const loadSharedGroups = async () => {
     try {
       const currentUserEmail = context.pageContext.user.email;
 
+      // 🔹 1. Grupos compartilhados (como já funciona)
       const gruposRaw: UsuarioListaItem[] = await sp.web.lists
         .getByTitle("UsuarioListas")
         .items.select(
@@ -269,20 +389,20 @@ const Dashboard: React.FC<IDashboardProps> = ({
           "idGrupo",
           "nomeGrupo",
           "email",
-          "privado"
+          "privado",
+          "descricao",
+          "updateDate",
+          "nomeAutor"
         )
         .filter(
           `email ne '${currentUserEmail}' and privado eq false and idGrupo ne 1`
         )();
 
-      if (gruposRaw.length === 0) {
-        setSharedGroupsMenu([]);
-        return;
-      }
+      const favoriteGroupIds = await loadFavoriteSharedGroups();
 
-      // 🔹 Agrupar por idGrupo
+      // 🔹 2. Agrupar por idGrupo
       const grouped: Record<
-        number,
+        string,
         { nomeGrupo: string; items: UsuarioListaItem[] }
       > = {};
 
@@ -303,7 +423,14 @@ const Dashboard: React.FC<IDashboardProps> = ({
           showChildren: true,
           data: {
             idGrupo: Number(idGrupo),
-            shared: true, // 🔥 útil pra regras futuras
+            shared: true,
+            isFavorited: favoriteGroupIds.includes(idGrupo),
+            iconComponent: buildInfoIcon(
+              group?.items[0]?.nomeAutor,
+              group?.items[0]?.email,
+              group?.items[0]?.descricao,
+              group?.items[0]?.updateDate
+            ),
           },
           children: group.items.map((i) => ({
             id: i.idItem!,
@@ -312,10 +439,34 @@ const Dashboard: React.FC<IDashboardProps> = ({
             data: {
               idGrupo: Number(idGrupo),
               shared: true,
+              ...baseDadosData?.find((item) => item.id0 === i.idItem),
             },
           })),
         })
       );
+
+      if (favoriteGroupIds.length > 0) {
+        const favoriteChildren = menu.filter((node) =>
+          favoriteGroupIds.includes(node.id)
+        );
+
+        if (favoriteChildren.length > 0) {
+          menu.unshift({
+            id: "favorite-shared",
+            title: "Acesso Rápido",
+            showChildren: true,
+            data: {
+              idGrupo: 2,
+              favoriteShared: true,
+              hideStar: true, // ⭐ não mostra estrela
+              iconComponent: <Library20Regular />, // 📚 ícone de biblioteca
+            },
+            children: favoriteChildren,
+          });
+        }
+      }
+
+      console.log(menu);
 
       setSharedGroupsMenu(menu);
     } catch (error) {
@@ -702,6 +853,41 @@ const Dashboard: React.FC<IDashboardProps> = ({
     else if (selectedDiretriz) setSelectedDiretriz(null);
   };
 
+  const onPressStarItemGroup = async (idItem: number) => {
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+
+      // 🔎 Verifica se já existe favorito para esse grupo
+      const existing = await sp.web.lists
+        .getByTitle("UsuarioListas")
+        .items.select("Id", "idItem", "email")
+        .filter(`email eq '${currentUserEmail}' and idItem eq ${idItem}`)();
+
+      if (existing.length > 0) {
+        for (const fav of existing) {
+          await sp.web.lists
+            .getByTitle("UsuarioListas")
+            .items.getById(fav.Id)
+            .delete();
+        }
+      } else {
+        await sp.web.lists.getByTitle("UsuarioListas").items.add({
+          Title: "Biblioteca de compartilhados",
+          email: currentUserEmail,
+          addDate: new Date(),
+          privado: true,
+          idGrupo: 2,
+          nomeGrupo: "Favoritos Compartilhados",
+          idItem: idItem,
+        });
+      }
+
+      await loadSharedGroups();
+    } catch (error) {
+      console.error("Erro ao favoritar/desfavoritar grupo", error);
+    }
+  };
+
   // ------------------------------
   // Render Diretrizes/Temas/Categorias
   // ------------------------------
@@ -818,37 +1004,40 @@ const Dashboard: React.FC<IDashboardProps> = ({
               </div>
             </div>
           )}
-          <div
-            id="reportContainerMain"
-            style={{
-              flex: 1,
-              minHeight: 500,
-              padding: 5,
-              border: "1px solid #ccd",
-              borderRadius: 8,
-              background: "#fff",
-            }}
-          >
-            {/* Nenhum item selecionado */}
-            {!selectedKpiData && (
-              <div style={{ color: "#666" }}>
-                Selecione um item no menu ao lado.
-              </div>
-            )}
+          {
+            <div
+              id="reportContainerMain"
+              key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
+              style={{
+                flex: 1,
+                minHeight: 650,
+                padding: 5,
+                border: "1px solid #ccd",
+                borderRadius: 8,
+                background: "#fff",
+              }}
+            >
+              {/* Nenhum item selecionado */}
+              {!selectedKpiData && (
+                <div style={{ color: "#666" }}>
+                  Selecione um item no menu ao lado.
+                </div>
+              )}
 
-            {/* Item selecionado SEM link */}
-            {selectedKpiData && !selectedKpiData?.link?.Url && (
-              <div
-                style={{
-                  color: "#999",
-                  fontSize: 16,
-                  fontWeight: 500,
-                }}
-              >
-                Sem link do Relatório
-              </div>
-            )}
-          </div>
+              {/* Item selecionado SEM link */}
+              {selectedKpiData && !selectedKpiData?.link?.Url && (
+                <div
+                  style={{
+                    color: "#999",
+                    fontSize: 16,
+                    fontWeight: 500,
+                  }}
+                >
+                  Sem link do Relatório
+                </div>
+              )}
+            </div>
+          }
         </div>
       </div>
     );
@@ -938,17 +1127,22 @@ const Dashboard: React.FC<IDashboardProps> = ({
           )}
           <div
             id="reportContainerMain"
+            key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
-              minHeight: 500,
+              minHeight: 650,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
               background: "#fff",
+              alignItems: "center", // eixo vertical
+              justifyContent: "center",
             }}
           >
             {!selectedItemLink && (
-              <div style={{ color: "#666" }}>
+              <div
+                style={{ color: "#666", alignSelf: "center", display: "flex" }}
+              >
                 Selecione um item no menu ao lado.
               </div>
             )}
@@ -1107,17 +1301,22 @@ const Dashboard: React.FC<IDashboardProps> = ({
           )}
           <div
             id="reportContainerMain"
+            key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
-              minHeight: 500,
+              minHeight: 650,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
               background: "#fff",
+              alignItems: "center", // eixo vertical
+              justifyContent: "center",
             }}
           >
             {!selectedItemLink && (
-              <div style={{ color: "#666" }}>
+              <div
+                style={{ color: "#666", alignSelf: "center", display: "flex" }}
+              >
                 Selecione um item no menu ao lado.
               </div>
             )}
@@ -1134,7 +1333,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
         : sharedGroupsMenu.length > 0;
 
     return (
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 10 }}>
         {/* 🔹 HEADER COM TABS + BOTÃO */}
         <div
           style={{
@@ -1183,7 +1382,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
               color: "#000",
             }}
           >
-            + Adicionar grupo
+            + Criar lista
           </button>
         </div>
 
@@ -1215,6 +1414,18 @@ const Dashboard: React.FC<IDashboardProps> = ({
               onSelect={onSelectGroupItem}
               menuVisible={menuVisibleGroups}
               onToggleMenu={setMenuVisibleGroups}
+              initialExpanded="closed"
+              onPressEditItemGroup={
+                groupsTab === "meus"
+                  ? (aId: any) => {
+                      setIdGrupoSelecionado(aId);
+                      setIsEditingGroup(true);
+                    }
+                  : undefined
+              }
+              onPressStarItemGroup={
+                groupsTab === "meus" ? undefined : onPressStarItemGroup
+              }
             />
 
             <div
@@ -1274,20 +1485,6 @@ const Dashboard: React.FC<IDashboardProps> = ({
                           <ArrowExpand20Regular />
                         )}
                       </div>
-                      {groupsTab === "meus" && (
-                        <div>
-                          <Edit20Regular
-                            style={{ cursor: "pointer" }}
-                            title="Editar grupo"
-                            onClick={() => {
-                              if (idGrupoSelecionado) {
-                                setIsEditingGroup(true);
-                              }
-                            }}
-                          />
-                          <span></span>
-                        </div>
-                      )}
                     </div>
                   }
                 </div>
@@ -1299,17 +1496,26 @@ const Dashboard: React.FC<IDashboardProps> = ({
                   flex: 1,
                   width: "100%",
                   height: "100%",
-                  minHeight: 500, // 🔑 MUITO importante
-                  padding: 5,
+                  minHeight: 650, // 🔑 MUITO importante
+                  // padding: 5,
                   border: "1px solid #ccd",
                   borderRadius: 8,
                   background: "#fff",
                   overflow: "hidden", // 🔑 Power BI gosta disso
                   display: "flex",
+                  alignItems: "center", // eixo vertical
+                  justifyContent: "center",
                 }}
+                key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
               >
                 {!selectedItemLink && (
-                  <div style={{ color: "#666" }}>
+                  <div
+                    style={{
+                      color: "#666",
+                      alignSelf: "center",
+                      display: "flex",
+                    }}
+                  >
                     Selecione um item no menu ao lado.
                   </div>
                 )}
@@ -1329,6 +1535,10 @@ const Dashboard: React.FC<IDashboardProps> = ({
     // Renderização de FAVORITOS - Exibe menu multinível direto
     if (activeTab === "favoritos") {
       return renderFavorites(data);
+    }
+
+    if (activeTab === "listas") {
+      return !isEditingGroup && !isSearching && renderUserGroupsMenu();
     }
 
     // Comportamento normal quando estiver em DIRETRIZES
@@ -1365,12 +1575,17 @@ const Dashboard: React.FC<IDashboardProps> = ({
             <TabList
               selectedValue={activeTab}
               onTabSelect={(e, data) => {
-                setActiveTab(data.value as "diretrizes" | "favoritos");
+                setSelectedKpiData(null);
+                setSelectedItemLink(null);
+                setActiveTab(
+                  data.value as "diretrizes" | "favoritos" | "listas"
+                );
               }}
               style={{ marginBottom: 10 }}
             >
               <Tab value="diretrizes">Diretrizes</Tab>
               <Tab value="favoritos">Favoritos</Tab>
+              <Tab value="listas">Listas</Tab>
             </TabList>
 
             {/* 🧱 Breadcrumb só fora da busca */}
@@ -1387,24 +1602,29 @@ const Dashboard: React.FC<IDashboardProps> = ({
             setMenuVisibleGroups(true);
             setIdGrupoSelecionado(null);
             setSelectedGroupKpiData(null);
-            setTimeout(() => {
-              setIsEditingGroup(false);
-            }, 1000);
+            // setTimeout(() => {
+            setIsEditingGroup(false);
+            // }, 1000);
           }}
         />
       ) : (
         <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 16,
-          }}
+          style={
+            activeTab !== "listas"
+              ? {
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 16,
+                  width: "100%",
+                }
+              : {}
+          }
         >
           {getContent()}
         </div>
       )}
 
-      {!isEditingGroup && !isSearching && renderUserGroupsMenu()}
+      {/* {!isEditingGroup && !isSearching && renderUserGroupsMenu()} */}
     </div>
   );
 };
