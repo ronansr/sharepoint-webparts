@@ -1,0 +1,25 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "c8c7b9a2-2e8b-4f55-9a4e-8d90d2c7a001",
+  "alias": "HeaderWebPart",
+  "componentType": "WebPart",
+  "version": "1.0.0",
+  "manifestVersion": 2,
+  "requiresCustomScript": false,
+  "supportedHosts": ["SharePointWebPart"],
+  "supportsFullBleed": true,
+  "preconfiguredEntries": [
+    {
+      "title": {
+        "default": "Header"
+      },
+      "description": {
+        "default": "Cabeçalho global da aplicação"
+      },
+      "officeFabricIconFontName": "PageHeader",
+      "properties": {
+        "logoUrl": ""
+      }
+    }
+  ]
+}

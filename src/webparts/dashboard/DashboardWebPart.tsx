@@ -3,20 +3,23 @@ import { BaseClientSideWebPart } from "@microsoft/sp-webpart-base";
 import * as React from "react";
 import * as ReactDom from "react-dom";
 import Dashboard from "./components/Dashboard";
-// import { IDynamicDataCallables } from "@microsoft/sp-dynamic-data";
 import { PropertyPaneToggle } from "@microsoft/sp-property-pane";
 
 export interface IDashboardWebPartProps {
   enableCleanLayout: boolean;
+  useInternalHeader: boolean; // 👈 NOVA PROPRIEDADE
 }
 
 export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWebPartProps> {
-  // implements IDDynamicDataCallables
   private selectedSector: string | null = null;
 
   protected onInit(): Promise<void> {
     this.context.dynamicDataSourceManager.initializeSource(this);
+
+    // valores padrão
     this.properties.enableCleanLayout ??= false;
+    this.properties.useInternalHeader ??= false; // 👈 NOVO
+
     return super.onInit();
   }
 
@@ -53,6 +56,11 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
                   onText: "Ativado",
                   offText: "Desativado",
                 }),
+                PropertyPaneToggle("useInternalHeader", {
+                  label: "Usar Header interno",
+                  onText: "Sim",
+                  offText: "Não",
+                }),
               ],
             },
           ],
@@ -67,6 +75,7 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
       setSelectedSector: this.setSelectedSectorValue.bind(this),
       context: this.context,
       enableCleanLayout: this.properties.enableCleanLayout,
+      useInternalHeader: this.properties.useInternalHeader, // 👈 PASSANDO PARA O DASHBOARD
     });
 
     ReactDom.render(element, this.domElement);

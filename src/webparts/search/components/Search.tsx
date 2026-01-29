@@ -25,7 +25,7 @@ const Search: React.FC = () => {
       <div
         style={{
           width: "100%",
-          marginBottom: 16,
+          // marginBottom: 16,
           display: "flex",
           alignItems: "center",
           border: isFocused ? "2px solid #000" : "1px solid #D6D6D6",
@@ -39,7 +39,7 @@ const Search: React.FC = () => {
       >
         <input
           type="text"
-          placeholder="Pesquisar diretrizes, temas, categorias ou KPIs..."
+          placeholder="Pesquisar..."
           value={value}
           onChange={onChange}
           autoComplete="off"

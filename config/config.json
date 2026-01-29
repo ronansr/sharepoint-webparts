@@ -33,6 +33,14 @@
           "manifest": "./src/webparts/CustomGroupsWebPart/CustomGroupsWebPart.manifest.json"
         }
       ]
+    },
+    "header-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/header/HeaderWebPart.js",
+          "manifest": "./src/webparts/header/HeaderWebPart.manifest.json"
+        }
+      ]
     }
   },
   "externals": {},

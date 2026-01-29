@@ -22,12 +22,14 @@ import { Edit20Regular } from "@fluentui/react-icons";
 import CustomGroups from "../../CustomGroupsWebPart/components/CustomGroups";
 import { Info20Regular } from "@fluentui/react-icons";
 import { TooltipHost } from "@fluentui/react";
+import Header from "../../header/components/Header";
 
 export interface IDashboardProps {
   context: WebPartContext;
   siteUrl: string;
   setSelectedSector: (sectorId: string) => void;
   enableCleanLayout: boolean;
+  useInternalHeader: boolean;
 }
 
 // Tipos
@@ -61,6 +63,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
   siteUrl,
   setSelectedSector,
   enableCleanLayout,
+  useInternalHeader,
 }) => {
   const [baseDadosData, setBaseDadosData] = useState<BaseDados[]>([]);
   const [hierarchy, setHierarchy] = useState<IDiretriz[]>([]);
@@ -180,44 +183,54 @@ const Dashboard: React.FC<IDashboardProps> = ({
     const style = document.createElement("style");
     style.id = styleId;
     style.innerHTML = `
-    /* 🔴 Header Microsoft */
-    #SuiteNavWrapper,
-    #suiteBarDelta {
-      display: none !important;
-    }
 
-    /* 🔵 Header do site */
-    #spSiteHeader,
-    .ms-compositeHeader {
-      display: none !important;
-    }
+      #contentBox {
+        display: flex !important;
+        justify-content: center !important;
+      }
 
-    /* 🟣 Menu lateral */
-    #spLeftNav,
-    #sp-appBar,
-    #spLeftNavContainer {
-      display: none !important;
-    }
+      .CanvasZone {
+        width: 100% !important;
+      }
 
-    /* 🟡 Command bar */
-    #spCommandBar {
-      display: none !important;
-    }
+    // /* 🔴 Header Microsoft */
+    // #SuiteNavWrapper,
+    // #suiteBarDelta {
+    //   display: none !important;
+    // }
 
-    /* 🟢 Conteúdo full width */
-    #contentBox,
-    #workbenchPageContent,
-    .CanvasZone,
-    .CanvasSection,
-    .CanvasZoneContainer {
-      margin-left: 0 !important;
-      max-width: 100% !important;
-    }
+    // /* 🔵 Header do site */
+    // #spSiteHeader,
+    // .ms-compositeHeader {
+    //   display: none !important;
+    // }
 
-    #s4-workspace,
-    #mainContent {
-      margin-top: 0 !important;
-    }
+    // /* 🟣 Menu lateral */
+    // #spLeftNav,
+    // #sp-appBar,
+    // #spLeftNavContainer {
+    //   display: none !important;
+    // }
+
+    // /* 🟡 Command bar */
+    // #spCommandBar {
+    //   display: none !important;
+    // }
+
+    // /* 🟢 Conteúdo full width */
+    // #contentBox,
+    // #workbenchPageContent,
+    // .CanvasZone,
+    // .CanvasSection,
+    // .CanvasZoneContainer {
+    //   margin-left: 0 !important;
+    //   max-width: 100% !important;
+    // }
+
+    // #s4-workspace,
+    // #mainContent {
+    //   margin-top: 0 !important;
+    // }
   `;
 
     document.head.appendChild(style);
@@ -1553,11 +1566,18 @@ Descrição: ${descricao ?? "Sem descrição"}.
   // ------------------------------
   return (
     <div>
+      {useInternalHeader && (
+        <Header
+          logoSrc={require("../../../assets/univesp-logo.png")}
+          context={context}
+        />
+      )}
       {/* 🔍 Modo Pesquisa */}
       {isSearching ? (
         <div
           style={{
             marginBottom: 16,
+            marginTop: 16,
             padding: "12px 16px",
             background: "#f0f0f0",
             borderRadius: 8,
