@@ -27,6 +27,9 @@ interface IBaseDadosItem {
   id0: string;
   Title: string;
   esconderNoMenu?: boolean;
+  link?: {
+    Url?: string;
+  };
 }
 
 const ITEMS_PER_PAGE = 8;
@@ -38,6 +41,9 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
   searchText,
 }) => {
   const [items, setItems] = React.useState<IBaseDadosItem[]>([]);
+  const [orderedBaseItems, setOrderedBaseItems] = React.useState<
+    IBaseDadosItem[]
+  >([]);
   const [favoriteIds, setFavoriteIds] = React.useState<string[]>([]);
   const [page, setPage] = React.useState(1);
 
@@ -46,9 +52,14 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
   );
 
   React.useEffect(() => {
-    loadItems();
     loadFavorites();
   }, []);
+
+  React.useEffect(() => {
+    if (favoriteIds.length >= 0) {
+      loadItems();
+    }
+  }, [favoriteIds]);
 
   React.useEffect(() => {
     setPage(1);
@@ -56,20 +67,30 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
 
   /* 📥 BaseDados */
   const loadItems = async (): Promise<void> => {
-    const data = await sp.web.lists
-      .getByTitle("BaseDados")
-      // .items.select("Id", "Title", "esconderNoMenu", "id")();
-      .items();
+    const data = await sp.web.lists.getByTitle("BaseDados").items();
 
-    setItems(
-      data.filter(
-        (i) =>
-          !i.esconderNoMenu &&
-          i.link && // existe
-          i.link.Url && // tem URL
-          i.link.Url.trim() !== ""
-      )
+    const filtered = data.filter(
+      (i) =>
+        !i.esconderNoMenu && i.link && i.link.Url && i.link.Url.trim() !== ""
     );
+
+    // 🔒 Ordem fixa: favoritos primeiro, depois alfabética
+    const orderedOnce = [...filtered].sort((a, b) => {
+      const aId = String(a.id0);
+      const bId = String(b.id0);
+
+      const aFav = favoriteIds.includes(aId);
+      const bFav = favoriteIds.includes(bId);
+
+      if (aFav !== bFav) {
+        return aFav ? -1 : 1;
+      }
+
+      return a.Title.localeCompare(b.Title);
+    });
+
+    setItems(filtered);
+    setOrderedBaseItems(orderedOnce);
   };
 
   /* ⭐ Favoritos */
@@ -88,7 +109,6 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
   const saveFavorite = async (item: IBaseDadosItem) => {
     try {
       const email = context.pageContext.user.email;
-      console.warn(item);
 
       await sp.web.lists.getByTitle("UsuarioListas").items.add({
         Title: item.Title,
@@ -117,37 +137,14 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
     }
   };
 
-  /* 🔍 Filtro + ordenação */
-
+  /* 🔍 Filtro (SEM reordenação) */
   const orderedItems = React.useMemo(() => {
     const q = searchText.toLowerCase();
 
-    return items
-      .filter((item) => (!q ? true : item.Title.toLowerCase().includes(q)))
-      .sort((a, b) => {
-        const aId = String(a.id0);
-        const bId = String(b.id0);
-
-        /* ☑ Selecionados primeiro */
-        const aSelected = selectedItems.some((s) => s.idItem === aId);
-        const bSelected = selectedItems.some((s) => s.idItem === bId);
-
-        if (aSelected !== bSelected) {
-          return aSelected ? -1 : 1;
-        }
-
-        /* ⭐ Favoritos depois */
-        const aFav = favoriteIds.includes(aId);
-        const bFav = favoriteIds.includes(bId);
-
-        if (aFav !== bFav) {
-          return aFav ? -1 : 1;
-        }
-
-        /* 🔤 Ordem alfabética */
-        return a.Title.localeCompare(b.Title);
-      });
-  }, [items, selectedItems, favoriteIds, searchText]);
+    return orderedBaseItems.filter((item) =>
+      !q ? true : item.Title.toLowerCase().includes(q)
+    );
+  }, [orderedBaseItems, searchText]);
 
   const totalPages = Math.ceil(orderedItems.length / ITEMS_PER_PAGE);
 

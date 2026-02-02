@@ -296,9 +296,10 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
           overflowY: "auto",
           // minHeight: 500, // ✅ garante scroll mesmo sem flex pai externo
           paddingRight: 4, // evita corte da scrollbar
+          maxHeight: 600,
         }}
       >
-        {renderTree(filteredData)}
+        {isMenuOpen && renderTree(filteredData)}
       </div>
     </div>
   );

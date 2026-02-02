@@ -82,6 +82,6 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
   }
 
   protected get dataVersion(): Version {
-    return Version.parse("1.0");
+    return Version.parse("1.1");
   }
 }

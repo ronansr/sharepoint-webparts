@@ -45,55 +45,59 @@ export class PowerBIService {
     paginaRelatorioBI?: string,
     filtroKpiSelecionado?: string
   ): Promise<void> {
-    const container = this.getContainer();
+    try {
+      const container = this.getContainer();
 
-    if (!container) {
-      console.error(`❌ Container ${this.containerId} não encontrado`);
-      return;
-    }
+      if (!container) {
+        console.error(`❌ Container ${this.containerId} não encontrado`);
+        return;
+      }
 
-    this.powerbi.reset(container);
+      this.powerbi.reset(container);
 
-    const tokenProvider =
-      await context.aadTokenProviderFactory.getTokenProvider();
+      const tokenProvider =
+        await context.aadTokenProviderFactory.getTokenProvider();
 
-    const token = await tokenProvider.getToken(
-      "https://analysis.windows.net/powerbi/api"
-    );
+      const token = await tokenProvider.getToken(
+        "https://analysis.windows.net/powerbi/api"
+      );
 
-    const config: pbi.IEmbedConfiguration = {
-      type: "report",
-      embedUrl,
-      id: reportId,
-      accessToken: token,
-      tokenType: pbi.models.TokenType.Aad,
-      permissions: pbi.models.Permissions.Read,
-      settings: {
-        filterPaneEnabled: false,
-        navContentPaneEnabled: true,
-        layoutType: pbi.models.LayoutType.Custom,
-        customLayout: {
-          displayOption: pbi.models.DisplayOption.FitToPage,
+      const config: pbi.IEmbedConfiguration = {
+        type: "report",
+        embedUrl,
+        id: reportId,
+        accessToken: token,
+        tokenType: pbi.models.TokenType.Aad,
+        permissions: pbi.models.Permissions.Read,
+        settings: {
+          filterPaneEnabled: false,
+          navContentPaneEnabled: true,
+          layoutType: pbi.models.LayoutType.Custom,
+          customLayout: {
+            displayOption: pbi.models.DisplayOption.FitToPage,
+          },
         },
-      },
-    };
+      };
 
-    this.report = this.powerbi.embed(container, config) as pbi.Report;
+      this.report = this.powerbi.embed(container, config) as pbi.Report;
 
-    this.observeResize(container);
-    this.observeContainerLifecycle();
+      this.observeResize(container);
+      this.observeContainerLifecycle();
 
-    this.report.on("loaded", async () => {
-      this.isReportLoaded = true;
+      this.report.on("loaded", async () => {
+        this.isReportLoaded = true;
 
-      if (paginaRelatorioBI) {
-        await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
-      }
+        if (paginaRelatorioBI) {
+          await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
+        }
 
-      if (filtroKpiSelecionado) {
-        await this.applyKpiSlicerFilter(filtroKpiSelecionado);
-      }
-    });
+        if (filtroKpiSelecionado) {
+          await this.applyKpiSlicerFilter(filtroKpiSelecionado);
+        }
+      });
+    } catch (error) {
+      console.warn("embedReport", error);
+    }
   }
 
   /* ===================== NAVEGAÇÃO ===================== */
@@ -256,7 +260,7 @@ export class PowerBIService {
 
     this.powerbi.reset(container);
     container.innerHTML = "";
-
+    this.report = undefined;
     this.destroyInternal();
   }
 

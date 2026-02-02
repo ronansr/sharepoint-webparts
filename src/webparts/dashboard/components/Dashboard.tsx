@@ -94,6 +94,8 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [sharedGroupsMenu, setSharedGroupsMenu] = useState<IGenericNode[]>([]);
   const [isGroupsReportFullscreen, setIsGroupsReportFullscreen] =
     useState(false);
+  const [showAllKpisMenu, setShowAllKpisMenu] = useState(false);
+  const [allKpisMenuData, setAllKpisMenuData] = useState<IGenericNode[]>([]);
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
   // const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
@@ -106,6 +108,8 @@ const Dashboard: React.FC<IDashboardProps> = ({
 
   const powerBIServiceMainRef = React.useRef<PowerBIService | null>(null);
   const powerBIServiceGroupsRef = React.useRef<PowerBIService | null>(null);
+  const powerBIServiceKPIsRef = React.useRef<PowerBIService | null>(null);
+  const powerBIServiceFavRef = React.useRef<PowerBIService | null>(null);
 
   if (!powerBIServiceMainRef.current) {
     powerBIServiceMainRef.current = new PowerBIService("reportContainerMain");
@@ -117,8 +121,18 @@ const Dashboard: React.FC<IDashboardProps> = ({
     );
   }
 
+  if (!powerBIServiceKPIsRef.current) {
+    powerBIServiceKPIsRef.current = new PowerBIService("reportContainerKPIs");
+  }
+
+  if (!powerBIServiceFavRef.current) {
+    powerBIServiceFavRef.current = new PowerBIService("reportContainerFav");
+  }
+
   const powerBIServiceMain = powerBIServiceMainRef.current;
   const powerBIServiceGroups = powerBIServiceGroupsRef.current;
+  const powerBIServiceKPIs = powerBIServiceKPIsRef.current;
+  const powerBIServiceFav = powerBIServiceFavRef.current;
 
   useEffect(() => {
     loadBaseDados();
@@ -134,22 +148,27 @@ const Dashboard: React.FC<IDashboardProps> = ({
   }, [selectedKpiData]);
 
   useEffect(() => {
-    // 🔄 Resetar seleção ao trocar de aba
+    // 🔴 LIMPA TUDO ANTES DO REACT REMOVER OS NÓS
+    powerBIServiceMain?.clearReport();
+    powerBIServiceGroups?.clearReport();
+    powerBIServiceKPIs?.clearReport();
+    // powerBIServiceFav?.clearReport();
+
     setSelectedKpiData(null);
+    setSelectedGroupKpiData(null);
     setSelectedItemLink(null);
     setSelectedDiretriz(null);
     setSelectedTema(null);
     setMenuVisible(true);
-    // powerBIService.clearReport();
+    setShowAllKpisMenu(false);
 
-    // // Opcional: sair do fullscreen se estiver ativo
-    // if (isFullscreen) {
-    //   powerBIService.toggleFullscreen(true);
-    //   setIsFullscreen(false);
-    // }
-
-    powerBIServiceMain.clearReport();
-    powerBIServiceGroups.clearReport();
+    return () => {
+      // 🔴 cleanup defensivo
+      powerBIServiceMain?.clearReport();
+      powerBIServiceGroups?.clearReport();
+      powerBIServiceKPIs?.clearReport();
+      // powerBIServiceFav?.clearReport();
+    };
   }, [activeTab]);
 
   useEffect(() => {
@@ -184,14 +203,42 @@ const Dashboard: React.FC<IDashboardProps> = ({
     style.id = styleId;
     style.innerHTML = `
 
-      #contentBox {
-        display: flex !important;
-        justify-content: center !important;
+      /* Header global */
+      #SuiteNavWrapper,
+      #suiteBarDelta {
+        display: none !important;
       }
 
-      .CanvasZone {
-        width: 100% !important;
+      /* Top command bar */
+      #spCommandBar {
+        display: none !important;
       }
+
+      /* Menu lateral */
+      #spLeftNav,
+      #sp-appBar {
+        display: none !important;
+      }
+
+      /* Ajuste do corpo */
+      #contentBox,
+      #workbenchPageContent,
+      .CanvasZone,
+      .CanvasSection {
+        margin: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+
+      /* Garante fullscreen real */
+      html,
+      body,
+      #spPageCanvasContent {
+        height: 100% !important;
+        width: 100% !important;
+        overflow: hidden;
+      }
+
 
     // /* 🔴 Header Microsoft */
     // #SuiteNavWrapper,
@@ -249,10 +296,16 @@ const Dashboard: React.FC<IDashboardProps> = ({
         .getByTitle("BaseDados")
         .items();
 
-      const itemsOk = items.filter((item) => item.status);
+      const itemsOk = items
+        .filter((item) => item.status)
+        .sort((a, b) =>
+          a.Title.localeCompare(b.Title, "pt-BR", {
+            sensitivity: "base",
+          })
+        );
       setBaseDadosData(itemsOk);
 
-      console.log("itemsOk", itemsOk);
+      // console.log("itemsOk", itemsOk);
       const structured = groupByHierarchy(itemsOk);
       setHierarchy(structured);
     } catch (error) {
@@ -695,6 +748,39 @@ Descrição: ${descricao ?? "Sem descrição"}.
     return nodes.map((node) => convertHierarchyToMenuTree(node));
   };
 
+  const buildAllKpisMenu = (): IGenericNode[] => {
+    return baseDadosData
+      .filter(
+        (item) =>
+          !!item.link && // tem link
+          !item.categoria // NÃO tem categoria
+      )
+      .map((item) => ({
+        id: item.id0 || item.Id.toString(),
+        title: item.Title,
+        link: item.id0 || item.Id.toString(),
+        data: item,
+      }));
+  };
+
+  const handleShowAllKpis = () => {
+    const menu = buildAllKpisMenu();
+
+    setAllKpisMenuData(menu);
+    setShowAllKpisMenu(true);
+
+    // limpa seleções anteriores
+    let kpis: any = {
+      id: "KPIs",
+      title: "Todos os KPIs",
+      descricao: "Exibir todos os KPIs",
+    };
+    setSelectedDiretriz(null);
+    setSelectedTema(null);
+    setSelectedKpiData(null);
+    setSelectedItemLink(null);
+  };
+
   // ------------------------------
   // Função para salvar favorito
   // ------------------------------
@@ -788,6 +874,12 @@ Descrição: ${descricao ?? "Sem descrição"}.
     // console.log("isFullscreen", isFullscreen);
     powerBIServiceGroups.toggleFullscreen(false);
     // setIsFullscreen((prev) => !prev);
+  };
+  const handleToggleFullscreenKPIs = () => {
+    powerBIServiceKPIs?.toggleFullscreen(false);
+  };
+  const handleToggleFullscreenFav = () => {
+    powerBIServiceFav?.toggleFullscreen(false);
   };
   // ------------------------------
   // Render Breadcrumb
@@ -904,28 +996,198 @@ Descrição: ${descricao ?? "Sem descrição"}.
   // ------------------------------
   // Render Diretrizes/Temas/Categorias
   // ------------------------------
-  const renderDiretrizes = (data: IDiretriz[]) =>
-    [...data]
-      .sort((a, b) => {
-        const aBuilding = !!a.extradata?.isBuilding;
-        const bBuilding = !!b.extradata?.isBuilding;
+  const renderDiretrizes = (data: IDiretriz[]) => {
+    return (
+      <>
+        {[...data]
+          .sort((a, b) => {
+            const aBuilding = !!a.extradata?.isBuilding;
+            const bBuilding = !!b.extradata?.isBuilding;
 
-        if (aBuilding === bBuilding) return 0;
-        return aBuilding ? 1 : -1;
-      })
-      .map((d) => (
+            if (aBuilding === bBuilding) return 0;
+            return aBuilding ? 1 : -1;
+          })
+          .map((d) => (
+            <SectorCard
+              key={d.id}
+              id={d.id}
+              title={d.title}
+              description={d.descricao}
+              onClick={() => setSelectedDiretriz(d)}
+              onStarClick={() => onClickFavorite(d)}
+              context={context}
+              siteUrl={siteUrl}
+              isBuilding={d.extradata?.isBuilding}
+            />
+          ))}
         <SectorCard
-          key={d.id}
-          id={d.id}
-          title={d.title}
-          description={d.descricao}
-          onClick={() => setSelectedDiretriz(d)}
-          onStarClick={() => onClickFavorite(d)}
+          id="all-kpis"
+          title="Exibir todos os KPIs"
+          description="Exibir todos os KPIs"
+          onClick={handleShowAllKpis}
           context={context}
           siteUrl={siteUrl}
-          isBuilding={d.extradata?.isBuilding}
+          isBuilding={false}
         />
-      ));
+      </>
+    );
+  };
+
+  const renderAllKpis = () => {
+    return (
+      <>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 20,
+            fontSize: 14,
+            borderTopWidth: 1,
+            borderColor: "black",
+          }}
+        >
+          <div
+            onClick={() => setShowAllKpisMenu(false)}
+            style={{
+              cursor: "pointer",
+              padding: 6,
+              borderRadius: 6,
+              background: "#eee",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <ChevronLeft20Filled color="black" />
+          </div>
+
+          <span
+            style={{
+              cursor: "pointer",
+              fontWeight: !selectedDiretriz ? "bold" : "normal",
+            }}
+            onClick={() => {
+              setShowAllKpisMenu(false);
+            }}
+          >
+            Diretrizes
+          </span>
+          <>
+            {" "}
+            <span>{"> "}</span>{" "}
+            <span
+              style={{
+                cursor: "pointer",
+                fontWeight: !selectedTema ? "bold" : "normal",
+              }}
+              onClick={() => setSelectedTema(null)}
+            >
+              Todos os KPIs
+            </span>{" "}
+          </>
+        </div>
+        <div style={{ display: "flex", width: "100%", gap: 5 }}>
+          <MultiLevelMenu
+            data={allKpisMenuData}
+            onSelect={(item) => {
+              setSelectedItemLink(item.link || item.id);
+              setSelectedSector(item.id);
+              setSelectedKpiData(item.data || null);
+
+              if (item.data?.link?.Url) {
+                powerBIServiceKPIs.embedReport(
+                  context,
+                  item.data.link.Url,
+                  extractReportId(item.data.link.Url) ?? "",
+                  item.data?.paginaRelatorioBI,
+                  item.data?.filtroKpiSelecionado
+                );
+              }
+            }}
+            menuVisible={menuVisible}
+            onToggleMenu={setMenuVisible}
+            showToggleOnlyValidates
+          />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            {selectedKpiData && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 16px",
+                  background: "#f0f0f0",
+                  borderRadius: 5,
+                  fontWeight: 600,
+                  fontSize: 16,
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Navigation20Regular
+                    style={{ cursor: "pointer" }}
+                    onClick={() => setMenuVisible(!menuVisible)}
+                  />
+                  <span>{selectedKpiData?.Title}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {/* Botão Tela Cheia */}
+                  <div
+                    onClick={handleToggleFullscreenKPIs}
+                    title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                    style={{
+                      cursor: "pointer",
+                      padding: 4,
+                      borderRadius: 6,
+                      display: "flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    {isFullscreen ? (
+                      <ArrowExpand20Regular />
+                    ) : (
+                      <ArrowExpand20Regular />
+                    )}
+                  </div>
+
+                  {/* Favorito */}
+                  <Star20Filled
+                    style={{
+                      color: isFavoritedItem ? "#f4b400" : "grey",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => onClickFavorite(selectedKpiData)}
+                  />
+                </div>
+                {/* <Star20Filled
+                style={{ color: isFavoritedItem ? "#f4b400" : "grey" }}
+                onClick={() => onClickFavorite(selectedKpiData)}
+              /> */}
+              </div>
+            )}
+            <div
+              id="reportContainerKPIs"
+              style={{
+                flex: 1,
+                minHeight: 650,
+                padding: 5,
+                border: "1px solid #ccd",
+                borderRadius: 8,
+                background: "#fff",
+              }}
+            >
+              {!selectedItemLink && (
+                <div style={{ color: "#666" }}>
+                  Selecione um KPI no menu ao lado.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   const renderTemas = (data: IDiretriz[]) =>
     selectedDiretriz?.temas.map((t) => (
       <SectorCard
@@ -943,7 +1205,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
     if (!selectedTema) return null;
     const menuData = convertToMenuTree(selectedTema);
     return (
-      <div style={{ display: "flex", width: "100%", gap: 5 }}>
+      <div style={{ display: "flex", width: "100%", gap: 5 }} key={"cat"}>
         <MultiLevelMenu
           data={menuData}
           onSelect={(item) => {
@@ -1020,7 +1282,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
           {
             <div
               id="reportContainerMain"
-              key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
+              // key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
               style={{
                 flex: 1,
                 minHeight: 650,
@@ -1061,7 +1323,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
     }
     const menuData = convertHierarchyListToMenuTree(data);
     return (
-      <div style={{ display: "flex", width: "100%", gap: 5 }}>
+      <div style={{ display: "flex", width: "100%", gap: 5 }} key={"favs"}>
         <MultiLevelMenu
           data={menuData}
           onSelect={(item) => {
@@ -1069,7 +1331,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
             setSelectedSector(item.id);
             setSelectedKpiData(item.data || null);
             if (item.data?.link?.Url)
-              powerBIServiceMain.embedReport(
+              powerBIServiceFav.embedReport(
                 context,
                 item.data.link.Url,
                 extractReportId(item.data.link.Url) ?? "",
@@ -1080,6 +1342,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
           menuVisible={menuVisible}
           onToggleMenu={setMenuVisible}
           showToggleOnlyValidates
+          expandAll={false}
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           {selectedKpiData && (
@@ -1106,7 +1369,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {/* Botão Tela Cheia */}
                 <div
-                  onClick={handleToggleFullscreen}
+                  onClick={handleToggleFullscreenFav}
                   title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
                   style={{
                     cursor: "pointer",
@@ -1139,7 +1402,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
             </div>
           )}
           <div
-            id="reportContainerMain"
+            id="reportContainerFav"
             key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
@@ -1314,7 +1577,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
           )}
           <div
             id="reportContainerMain"
-            key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
+            // key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
               minHeight: 650,
@@ -1519,7 +1782,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
                   alignItems: "center", // eixo vertical
                   justifyContent: "center",
                 }}
-                key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
+                // key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
               >
                 {!selectedItemLink && (
                   <div
@@ -1555,7 +1818,10 @@ Descrição: ${descricao ?? "Sem descrição"}.
     }
 
     // Comportamento normal quando estiver em DIRETRIZES
-    if (!selectedDiretriz) return renderDiretrizes(data);
+    if (!selectedDiretriz) {
+      if (showAllKpisMenu) return renderAllKpis();
+      return renderDiretrizes(data);
+    }
     if (!selectedTema) return renderTemas(data);
     return renderCategorias(data);
   };
@@ -1572,6 +1838,10 @@ Descrição: ${descricao ?? "Sem descrição"}.
           context={context}
         />
       )}
+      {/* <Header
+        logoSrc={require("../../../assets/univesp-logo.png")}
+        context={context}
+      /> */}
       {/* 🔍 Modo Pesquisa */}
       {isSearching ? (
         <div
@@ -1597,6 +1867,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
               onTabSelect={(e, data) => {
                 setSelectedKpiData(null);
                 setSelectedItemLink(null);
+                setShowAllKpisMenu(false);
                 setActiveTab(
                   data.value as "diretrizes" | "favoritos" | "listas"
                 );

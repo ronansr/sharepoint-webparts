@@ -165,22 +165,26 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         </div>
 
         {/* Estrela */}
-        <div
-          onClick={(e) => {
-            if (isBuilding) return;
-            e.stopPropagation();
-            onStarClick?.();
-            setIsFav((prev) => !prev);
-          }}
-          style={{
-            position: "absolute",
-            bottom: 10,
-            right: 12,
-            cursor: isBuilding ? "default" : "pointer",
-          }}
-        >
-          <Star20Filled style={{ color: isFav ? "#f4b400" : "gray" }} />
-        </div>
+        {onStarClick ? (
+          <div
+            onClick={(e) => {
+              if (isBuilding) return;
+              e.stopPropagation();
+              onStarClick?.();
+              setIsFav((prev) => !prev);
+            }}
+            style={{
+              position: "absolute",
+              bottom: 10,
+              right: 12,
+              cursor: isBuilding ? "default" : "pointer",
+            }}
+          >
+            <Star20Filled style={{ color: isFav ? "#f4b400" : "gray" }} />
+          </div>
+        ) : (
+          <></>
+        )}
 
         {/* 🛑 OVERLAY "EM DESENVOLVIMENTO" */}
         {isBuilding && (
