@@ -290,22 +290,56 @@ const Dashboard: React.FC<IDashboardProps> = ({
   // ------------------------------
   // Buscar BaseDados
   // ------------------------------
+  // const loadBaseDados = async () => {
+  //   try {
+  //     const items: BaseDados[] = await sp.web.lists
+  //       .getByTitle("BaseDados")
+  //       .items();
+  //     console.log("items", items);
+
+  //     const itemsOk = items
+  //       .filter((item) => item.status)
+  //       .sort((a, b) =>
+  //         a.Title.localeCompare(b.Title, "pt-BR", {
+  //           sensitivity: "base",
+  //         })
+  //       );
+  //     setBaseDadosData(itemsOk);
+
+  //     console.log("itemsOk", itemsOk);
+  //     const structured = groupByHierarchy(itemsOk);
+  //     setHierarchy(structured);
+  //   } catch (error) {
+  //     console.error("Erro ao buscar BaseDados", error);
+  //   }
+  // };
+
   const loadBaseDados = async () => {
     try {
-      const items: BaseDados[] = await sp.web.lists
-        .getByTitle("BaseDados")
-        .items();
+      const list = sp.web.lists.getByTitle("BaseDados");
 
-      const itemsOk = items
+      const PAGE_SIZE = 100;
+      let allItems: BaseDados[] = [];
+      let skip = 0;
+      let batch: BaseDados[] = [];
+
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)(); // 🔑 sem .select → todas as colunas
+
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
+
+      console.log("items", allItems);
+
+      const itemsOk = allItems
         .filter((item) => item.status)
         .sort((a, b) =>
-          a.Title.localeCompare(b.Title, "pt-BR", {
-            sensitivity: "base",
-          })
+          a.Title.localeCompare(b.Title, "pt-BR", { sensitivity: "base" })
         );
+
       setBaseDadosData(itemsOk);
 
-      // console.log("itemsOk", itemsOk);
       const structured = groupByHierarchy(itemsOk);
       setHierarchy(structured);
     } catch (error) {
@@ -319,13 +353,21 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const loadFavoritos = async () => {
     try {
       const currentUserEmail = context.pageContext.user.email;
+      const list = sp.web.lists.getByTitle("UsuarioListas");
 
-      // 1. Buscar favoritos do usuário
-      const favoritesRaw: UsuarioListaItem[] = await sp.web.lists
-        .getByTitle("UsuarioListas")
-        .items();
+      const PAGE_SIZE = 100;
+      let allItems: UsuarioListaItem[] = [];
+      let skip = 0;
+      let batch: UsuarioListaItem[] = [];
 
-      const favorites = favoritesRaw.filter(
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)();
+
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
+
+      const favorites = allItems.filter(
         (fav) => fav.email === currentUserEmail && fav.idGrupo === 1
       );
 
@@ -335,35 +377,131 @@ const Dashboard: React.FC<IDashboardProps> = ({
       }
 
       const hierarchyFav = getFavoritesOnly(hierarchy, favorites);
-
-      // console.log(hierarchyFav);
-
       setFavoriteHierarchy(hierarchyFav);
-
-      return;
     } catch (error) {
       console.error("Erro ao carregar favoritos", error);
       setFavoriteHierarchy([]);
     }
   };
 
+  // const loadFavoritos = async () => {
+  //   try {
+  //     const currentUserEmail = context.pageContext.user.email;
+
+  //     // 1. Buscar favoritos do usuário
+  //     const favoritesRaw: UsuarioListaItem[] = await sp.web.lists
+  //       .getByTitle("UsuarioListas")
+  //       .items();
+
+  //     const favorites = favoritesRaw.filter(
+  //       (fav) => fav.email === currentUserEmail && fav.idGrupo === 1
+  //     );
+
+  //     if (favorites.length === 0) {
+  //       setFavoriteHierarchy([]);
+  //       return;
+  //     }
+
+  //     const hierarchyFav = getFavoritesOnly(hierarchy, favorites);
+
+  //     // console.log(hierarchyFav);
+
+  //     setFavoriteHierarchy(hierarchyFav);
+
+  //     return;
+  //   } catch (error) {
+  //     console.error("Erro ao carregar favoritos", error);
+  //     setFavoriteHierarchy([]);
+  //   }
+  // };
+
+  // const loadUserGroups = async () => {
+  //   try {
+  //     const currentUserEmail = context.pageContext.user.email;
+
+  //     const gruposRaw: UsuarioListaItem[] = await sp.web.lists
+  //       .getByTitle("UsuarioListas")
+  //       .items.select("Id", "Title", "idItem", "idGrupo", "nomeGrupo", "email")
+  //       .filter(
+  //         `email eq '${currentUserEmail}' and idGrupo ne 1 and idGrupo ne 2`
+  //       )();
+
+  //     if (gruposRaw.length === 0) {
+  //       setUserGroupsMenu([]);
+  //       return;
+  //     }
+
+  //     // 🔹 Agrupa por nomeGrupo
+  //     const grouped: Record<
+  //       number,
+  //       { nomeGrupo: string; items: UsuarioListaItem[] }
+  //     > = {};
+
+  //     gruposRaw.forEach((item) => {
+  //       if (!grouped[item.idGrupo]) {
+  //         grouped[item.idGrupo] = {
+  //           nomeGrupo: item.nomeGrupo!,
+  //           items: [],
+  //         };
+  //       }
+  //       grouped[item.idGrupo].items.push(item);
+  //     });
+  //     console.log(baseDadosData);
+
+  //     const menu: IGenericNode[] = Object.entries(grouped).map(
+  //       ([idGrupo, group]) => ({
+  //         id: idGrupo, // 🔑 idGrupo aqui
+  //         title: group.nomeGrupo,
+  //         showChildren: true,
+  //         data: { idGrupo: Number(idGrupo) },
+  //         children: group.items.map((i) => ({
+  //           id: i.idItem!,
+  //           title: i.Title,
+  //           link: i.idItem,
+  //           data: {
+  //             idGrupo: Number(idGrupo),
+  //             ...baseDadosData?.find((item) => item.id0 === i.idItem),
+  //           },
+  //         })),
+  //       })
+  //     );
+  //     console.log(menu);
+  //     setUserGroupsMenu(menu);
+  //   } catch (error) {
+  //     console.error("Erro ao carregar grupos do usuário", error);
+  //     setUserGroupsMenu([]);
+  //   }
+  // };
   const loadUserGroups = async () => {
     try {
       const currentUserEmail = context.pageContext.user.email;
+      const list = sp.web.lists.getByTitle("UsuarioListas");
 
-      const gruposRaw: UsuarioListaItem[] = await sp.web.lists
-        .getByTitle("UsuarioListas")
-        .items.select("Id", "Title", "idItem", "idGrupo", "nomeGrupo", "email")
-        .filter(
-          `email eq '${currentUserEmail}' and idGrupo ne 1 and idGrupo ne 2`
-        )();
+      const PAGE_SIZE = 100;
+      let allItems: UsuarioListaItem[] = [];
+      let skip = 0;
+      let batch: UsuarioListaItem[] = [];
+
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)();
+
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
+
+      const gruposRaw = allItems.filter(
+        (item) =>
+          item.email === currentUserEmail &&
+          item.idGrupo !== 1 &&
+          item.idGrupo !== 2
+      );
 
       if (gruposRaw.length === 0) {
         setUserGroupsMenu([]);
         return;
       }
 
-      // 🔹 Agrupa por nomeGrupo
+      // 🔹 Agrupa por idGrupo
       const grouped: Record<
         number,
         { nomeGrupo: string; items: UsuarioListaItem[] }
@@ -372,17 +510,16 @@ const Dashboard: React.FC<IDashboardProps> = ({
       gruposRaw.forEach((item) => {
         if (!grouped[item.idGrupo]) {
           grouped[item.idGrupo] = {
-            nomeGrupo: item.nomeGrupo!,
+            nomeGrupo: item.nomeGrupo || "Grupo",
             items: [],
           };
         }
         grouped[item.idGrupo].items.push(item);
       });
-      console.log(baseDadosData);
 
       const menu: IGenericNode[] = Object.entries(grouped).map(
         ([idGrupo, group]) => ({
-          id: idGrupo, // 🔑 idGrupo aqui
+          id: idGrupo,
           title: group.nomeGrupo,
           showChildren: true,
           data: { idGrupo: Number(idGrupo) },
@@ -397,30 +534,62 @@ const Dashboard: React.FC<IDashboardProps> = ({
           })),
         })
       );
-      console.log(menu);
+
       setUserGroupsMenu(menu);
     } catch (error) {
       console.error("Erro ao carregar grupos do usuário", error);
       setUserGroupsMenu([]);
     }
   };
-
   const loadFavoriteSharedGroups = async (): Promise<string[]> => {
-    const currentUserEmail = context.pageContext.user.email;
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+      const list = sp.web.lists.getByTitle("UsuarioListas");
 
-    const items: UsuarioListaItem[] = await sp.web.lists
-      .getByTitle("UsuarioListas")
-      .items.select("idItem")
-      .filter(`email eq '${currentUserEmail}' and idGrupo eq 2`)();
+      const PAGE_SIZE = 100;
+      let allItems: UsuarioListaItem[] = [];
+      let skip = 0;
+      let batch: UsuarioListaItem[] = [];
 
-    return Array.from(
-      new Set(
-        items
-          .map((i) => i.idItem)
-          .filter((id): id is string => typeof id === "string")
-      )
-    );
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)();
+
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
+
+      return Array.from(
+        new Set(
+          allItems
+            .filter(
+              (item) => item.email === currentUserEmail && item.idGrupo === 2
+            )
+            .map((i) => i.idItem)
+            .filter((id): id is string => typeof id === "string")
+        )
+      );
+    } catch (error) {
+      console.error("Erro ao carregar favoritos compartilhados", error);
+      return [];
+    }
   };
+
+  // const loadFavoriteSharedGroups = async (): Promise<string[]> => {
+  //   const currentUserEmail = context.pageContext.user.email;
+
+  //   const items: UsuarioListaItem[] = await sp.web.lists
+  //     .getByTitle("UsuarioListas")
+  //     .items.select("idItem")
+  //     .filter(`email eq '${currentUserEmail}' and idGrupo eq 2`)();
+
+  //   return Array.from(
+  //     new Set(
+  //       items
+  //         .map((i) => i.idItem)
+  //         .filter((id): id is string => typeof id === "string")
+  //     )
+  //   );
+  // };
 
   const buildInfoIcon = (
     nomeAutor?: string,

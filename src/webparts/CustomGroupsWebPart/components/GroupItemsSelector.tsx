@@ -67,43 +67,116 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
 
   /* 📥 BaseDados */
   const loadItems = async (): Promise<void> => {
-    const data = await sp.web.lists.getByTitle("BaseDados").items();
+    try {
+      const list = sp.web.lists.getByTitle("BaseDados");
 
-    const filtered = data.filter(
-      (i) =>
-        !i.esconderNoMenu && i.link && i.link.Url && i.link.Url.trim() !== ""
-    );
+      const PAGE_SIZE = 100;
+      let allItems: any[] = [];
+      let skip = 0;
+      let batch: any[] = [];
 
-    // 🔒 Ordem fixa: favoritos primeiro, depois alfabética
-    const orderedOnce = [...filtered].sort((a, b) => {
-      const aId = String(a.id0);
-      const bId = String(b.id0);
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)();
 
-      const aFav = favoriteIds.includes(aId);
-      const bFav = favoriteIds.includes(bId);
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
 
-      if (aFav !== bFav) {
-        return aFav ? -1 : 1;
-      }
+      const filtered = allItems.filter(
+        (i) =>
+          !i.esconderNoMenu && i.link && i.link.Url && i.link.Url.trim() !== ""
+      );
 
-      return a.Title.localeCompare(b.Title);
-    });
+      // 🔒 Ordem fixa: favoritos primeiro, depois alfabética
+      const orderedOnce = [...filtered].sort((a, b) => {
+        const aId = String(a.id0);
+        const bId = String(b.id0);
 
-    setItems(filtered);
-    setOrderedBaseItems(orderedOnce);
+        const aFav = favoriteIds.includes(aId);
+        const bFav = favoriteIds.includes(bId);
+
+        if (aFav !== bFav) {
+          return aFav ? -1 : 1;
+        }
+
+        return a.Title.localeCompare(b.Title, "pt-BR", {
+          sensitivity: "base",
+        });
+      });
+
+      setItems(filtered);
+      setOrderedBaseItems(orderedOnce);
+    } catch (error) {
+      console.error("Erro ao carregar BaseDados", error);
+    }
   };
+
+  // const loadItems = async (): Promise<void> => {
+  //   const data = await sp.web.lists.getByTitle("BaseDados").items();
+
+  //   const filtered = data.filter(
+  //     (i) =>
+  //       !i.esconderNoMenu && i.link && i.link.Url && i.link.Url.trim() !== ""
+  //   );
+
+  //   // 🔒 Ordem fixa: favoritos primeiro, depois alfabética
+  //   const orderedOnce = [...filtered].sort((a, b) => {
+  //     const aId = String(a.id0);
+  //     const bId = String(b.id0);
+
+  //     const aFav = favoriteIds.includes(aId);
+  //     const bFav = favoriteIds.includes(bId);
+
+  //     if (aFav !== bFav) {
+  //       return aFav ? -1 : 1;
+  //     }
+
+  //     return a.Title.localeCompare(b.Title);
+  //   });
+
+  //   setItems(filtered);
+  //   setOrderedBaseItems(orderedOnce);
+  // };
 
   /* ⭐ Favoritos */
   const loadFavorites = async (): Promise<void> => {
-    const email = context.pageContext.user.email;
+    try {
+      const email = context.pageContext.user.email;
+      const list = sp.web.lists.getByTitle("UsuarioListas");
 
-    const favs = await sp.web.lists
-      .getByTitle("UsuarioListas")
-      .items.filter(`email eq '${email}' and privado eq 1`)
-      .select("idItem")();
+      const PAGE_SIZE = 100;
+      let allItems: any[] = [];
+      let skip = 0;
+      let batch: any[] = [];
 
-    setFavoriteIds(favs.map((f) => String(f.idItem)));
+      do {
+        batch = await list.items.top(PAGE_SIZE).skip(skip)();
+
+        allItems = allItems.concat(batch);
+        skip += PAGE_SIZE;
+      } while (batch.length === PAGE_SIZE);
+
+      const favs = allItems.filter(
+        (item) => item.email === email && item.privado === true
+      );
+
+      setFavoriteIds(favs.map((f) => String(f.idItem)));
+    } catch (error) {
+      console.error("Erro ao carregar favoritos", error);
+      setFavoriteIds([]);
+    }
   };
+
+  // const loadFavorites = async (): Promise<void> => {
+  //   const email = context.pageContext.user.email;
+
+  //   const favs = await sp.web.lists
+  //     .getByTitle("UsuarioListas")
+  //     .items.filter(`email eq '${email}' and privado eq 1`)
+  //     .select("idItem")();
+
+  //   setFavoriteIds(favs.map((f) => String(f.idItem)));
+  // };
 
   /* ⭐ Salvar favorito */
   const saveFavorite = async (item: IBaseDadosItem) => {
