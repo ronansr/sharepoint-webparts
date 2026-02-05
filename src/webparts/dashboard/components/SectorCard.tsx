@@ -176,7 +176,7 @@ const SectorCard: React.FC<ISectorCardProps> = ({
             style={{
               position: "absolute",
               bottom: 10,
-              right: 12,
+              right: 20,
               cursor: isBuilding ? "default" : "pointer",
             }}
           >

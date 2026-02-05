@@ -3,11 +3,15 @@ import { BaseClientSideWebPart } from "@microsoft/sp-webpart-base";
 import * as React from "react";
 import * as ReactDom from "react-dom";
 import Dashboard from "./components/Dashboard";
-import { PropertyPaneToggle } from "@microsoft/sp-property-pane";
+import {
+  PropertyPaneToggle,
+  PropertyPaneTextField,
+} from "@microsoft/sp-property-pane";
 
 export interface IDashboardWebPartProps {
   enableCleanLayout: boolean;
-  useInternalHeader: boolean; // 👈 NOVA PROPRIEDADE
+  useInternalHeader: boolean;
+  additionalCss: string; // 👈 NOVA PROPRIEDADE
 }
 
 export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWebPartProps> {
@@ -16,9 +20,9 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
   protected onInit(): Promise<void> {
     this.context.dynamicDataSourceManager.initializeSource(this);
 
-    // valores padrão
     this.properties.enableCleanLayout ??= false;
-    this.properties.useInternalHeader ??= false; // 👈 NOVO
+    this.properties.useInternalHeader ??= false;
+    this.properties.additionalCss ??= ""; // 👈 default
 
     return super.onInit();
   }
@@ -61,6 +65,12 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
                   onText: "Sim",
                   offText: "Não",
                 }),
+                PropertyPaneTextField("additionalCss", {
+                  label: "CSS adicional",
+                  multiline: true,
+                  rows: 10,
+                  placeholder: "Digite CSS customizado aqui...",
+                }),
               ],
             },
           ],
@@ -75,13 +85,14 @@ export default class DashboardWebPart extends BaseClientSideWebPart<IDashboardWe
       setSelectedSector: this.setSelectedSectorValue.bind(this),
       context: this.context,
       enableCleanLayout: this.properties.enableCleanLayout,
-      useInternalHeader: this.properties.useInternalHeader, // 👈 PASSANDO PARA O DASHBOARD
+      useInternalHeader: this.properties.useInternalHeader,
+      additionalCss: this.properties.additionalCss, // 👈 PASSANDO
     });
 
     ReactDom.render(element, this.domElement);
   }
 
   protected get dataVersion(): Version {
-    return Version.parse("1.1");
+    return Version.parse("1.2");
   }
 }

@@ -34,3 +34,18 @@ h3 {
 .button:hover {
   background-color: #005a9e;
 }
+
+.dashboardContainer {
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
+  margin: 15px;
+}
+
+@media (min-width: 1327px) {
+  .dashboardContainer {
+    max-width: 1327px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

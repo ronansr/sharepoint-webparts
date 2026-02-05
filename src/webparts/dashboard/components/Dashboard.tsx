@@ -16,13 +16,14 @@ import {
 import MultiLevelMenu, { IGenericNode } from "./MultiLeveMenu";
 import { PowerBIService } from "../../../services/PowerBIService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { extractReportId, filterHierarchy } from "../../../utils";
+import { extractReportId, filterHierarchy, getCleanModeFromUrl } from "../../../utils";
 import { TabList, Tab } from "@fluentui/react-components";
 import { Edit20Regular } from "@fluentui/react-icons";
 import CustomGroups from "../../CustomGroupsWebPart/components/CustomGroups";
 import { Info20Regular } from "@fluentui/react-icons";
 import { TooltipHost } from "@fluentui/react";
 import Header from "../../header/components/Header";
+import styles from './Dashboard.module.scss';
 
 export interface IDashboardProps {
   context: WebPartContext;
@@ -30,9 +31,12 @@ export interface IDashboardProps {
   setSelectedSector: (sectorId: string) => void;
   enableCleanLayout: boolean;
   useInternalHeader: boolean;
+  additionalCss: string;
 }
 
 // Tipos
+
+
 
 interface BaseDados {
   Id: number;
@@ -64,6 +68,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
   setSelectedSector,
   enableCleanLayout,
   useInternalHeader,
+  additionalCss
 }) => {
   const [baseDadosData, setBaseDadosData] = useState<BaseDados[]>([]);
   const [hierarchy, setHierarchy] = useState<IDiretriz[]>([]);
@@ -96,6 +101,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
     useState(false);
   const [showAllKpisMenu, setShowAllKpisMenu] = useState(false);
   const [allKpisMenuData, setAllKpisMenuData] = useState<IGenericNode[]>([]);
+  const [enableCleanLayoutURL, setEnableCleanLayoutURL] = React.useState<boolean>(true);
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
   // const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
@@ -133,6 +139,127 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const powerBIServiceGroups = powerBIServiceGroupsRef.current;
   const powerBIServiceKPIs = powerBIServiceKPIsRef.current;
   const powerBIServiceFav = powerBIServiceFavRef.current;
+
+  useEffect(() => {
+  const cleanMode = getCleanModeFromUrl();
+  setEnableCleanLayoutURL(cleanMode);
+}, []);
+
+  useEffect(() => {
+    const styleId = "dashboard-clean-layout-style";
+
+    // Remove se existir
+    const existing = document.getElementById(styleId);
+    if (existing) existing.remove();
+
+    if (!enableCleanLayoutURL) return;
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.innerHTML = `
+
+    /* Ocultar elementos do SharePoint */
+    #SuiteNavWrapper,
+    #suiteBarDelta,
+    #spSiteHeader,
+    .ms-compositeHeader,
+    #spLeftNav,
+    #sp-appBar,
+    #spLeftNavContainer,
+    #spCommandBar,
+    #CommentsWrapper,
+    [class^="headerRow-"] {
+      display: none !important;
+    }
+
+    /* Containers principais */
+    body,
+    #s4-workspace,
+    #contentBox,
+    #workbenchPageContent,
+    #spPageCanvasContent {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Canvas containers */
+    .CanvasZoneContainer,
+    .CanvasZone,
+    .CanvasSection,
+    .CanvasZoneSectionContainer {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* Webparts */
+    .CanvasComponent,
+    .CanvasComponent > div {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* ControlZone */
+    .ControlZone,
+    .ControlZone--clean,
+    .ControlZone--control {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .ControlZone--control > div,
+    .ControlZone > div {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    /* Sections */
+    .CanvasSection,
+    .CanvasSection-col,
+    .CanvasSection-sm12,
+    .CanvasSection-xl12,
+    .CanvasSection--read {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    #mainContent {
+      margin-top: 0 !important;
+    }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, [enableCleanLayoutURL]);
+
+  useEffect(() => {
+    const styleId = "dashboard-additional-css";
+
+    const existing = document.getElementById(styleId);
+    if (existing) existing.remove();
+
+    if (!additionalCss) return;
+
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.innerHTML = additionalCss;
+
+    document.head.appendChild(style);
+
+    return () => style.remove();
+  }, [additionalCss]);
 
   useEffect(() => {
     loadBaseDados();
@@ -190,102 +317,102 @@ const Dashboard: React.FC<IDashboardProps> = ({
     } else loadUserGroups();
   }, [groupsTab, isEditingGroup, baseDadosData]);
 
-  useEffect(() => {
-    const styleId = "dashboard-clean-layout-style";
+  // useEffect(() => {
+  //   const styleId = "dashboard-clean-layout-style";
 
-    // Remove se existir
-    const existing = document.getElementById(styleId);
-    if (existing) existing.remove();
+  //   // Remove se existir
+  //   const existing = document.getElementById(styleId);
+  //   if (existing) existing.remove();
 
-    if (!enableCleanLayout) return;
+  //   if (!enableCleanLayout) return;
 
-    const style = document.createElement("style");
-    style.id = styleId;
-    style.innerHTML = `
+  //   const style = document.createElement("style");
+  //   style.id = styleId;
+  //   style.innerHTML = `
 
-      /* Header global */
-      #SuiteNavWrapper,
-      #suiteBarDelta {
-        display: none !important;
-      }
+  //     /* Header global */
+  //     #SuiteNavWrapper,
+  //     #suiteBarDelta {
+  //       display: none !important;
+  //     }
 
-      /* Top command bar */
-      #spCommandBar {
-        display: none !important;
-      }
+  //     /* Top command bar */
+  //     #spCommandBar {
+  //       display: none !important;
+  //     }
 
-      /* Menu lateral */
-      #spLeftNav,
-      #sp-appBar {
-        display: none !important;
-      }
+  //     /* Menu lateral */
+  //     #spLeftNav,
+  //     #sp-appBar {
+  //       display: none !important;
+  //     }
 
-      /* Ajuste do corpo */
-      #contentBox,
-      #workbenchPageContent,
-      .CanvasZone,
-      .CanvasSection {
-        margin: 0 !important;
-        padding: 0 !important;
-        max-width: 100% !important;
-      }
+  //     /* Ajuste do corpo */
+  //     #contentBox,
+  //     #workbenchPageContent,
+  //     .CanvasZone,
+  //     .CanvasSection {
+  //       margin: 0 !important;
+  //       padding: 0 !important;
+  //       max-width: 100% !important;
+  //     }
 
-      /* Garante fullscreen real */
-      html,
-      body,
-      #spPageCanvasContent {
-        height: 100% !important;
-        width: 100% !important;
-        overflow: hidden;
-      }
+  //     /* Garante fullscreen real */
+  //     html,
+  //     body,
+  //     #spPageCanvasContent {
+  //       height: 100% !important;
+  //       width: 100% !important;
+  //       overflow: hidden;
+  //     }
 
 
-    // /* 🔴 Header Microsoft */
-    // #SuiteNavWrapper,
-    // #suiteBarDelta {
-    //   display: none !important;
-    // }
+  //   // /* 🔴 Header Microsoft */
+  //   // #SuiteNavWrapper,
+  //   // #suiteBarDelta {
+  //   //   display: none !important;
+  //   // }
 
-    // /* 🔵 Header do site */
-    // #spSiteHeader,
-    // .ms-compositeHeader {
-    //   display: none !important;
-    // }
+  //   // /* 🔵 Header do site */
+  //   // #spSiteHeader,
+  //   // .ms-compositeHeader {
+  //   //   display: none !important;
+  //   // }
 
-    // /* 🟣 Menu lateral */
-    // #spLeftNav,
-    // #sp-appBar,
-    // #spLeftNavContainer {
-    //   display: none !important;
-    // }
+  //   // /* 🟣 Menu lateral */
+  //   // #spLeftNav,
+  //   // #sp-appBar,
+  //   // #spLeftNavContainer {
+  //   //   display: none !important;
+  //   // }
 
-    // /* 🟡 Command bar */
-    // #spCommandBar {
-    //   display: none !important;
-    // }
+  //   // /* 🟡 Command bar */
+  //   // #spCommandBar {
+  //   //   display: none !important;
+  //   // }
 
-    // /* 🟢 Conteúdo full width */
-    // #contentBox,
-    // #workbenchPageContent,
-    // .CanvasZone,
-    // .CanvasSection,
-    // .CanvasZoneContainer {
-    //   margin-left: 0 !important;
-    //   max-width: 100% !important;
-    // }
+  //   // /* 🟢 Conteúdo full width */
+  //   // #contentBox,
+  //   // #workbenchPageContent,
+  //   // .CanvasZone,
+  //   // .CanvasSection,
+  //   // .CanvasZoneContainer {
+  //   //   margin-left: 0 !important;
+  //   //   max-width: 100% !important;
+  //   // }
 
-    // #s4-workspace,
-    // #mainContent {
-    //   margin-top: 0 !important;
-    // }
-  `;
+  //   // #s4-workspace,
+  //   // #mainContent {
+  //   //   margin-top: 0 !important;
+  //   // }
+  // `;
 
-    document.head.appendChild(style);
+  //   document.head.appendChild(style);
 
-    return () => {
-      style.remove();
-    };
-  }, [enableCleanLayout]);
+  //   return () => {
+  //     style.remove();
+  //   };
+  // }, [enableCleanLayout]);
 
   // ------------------------------
   // Buscar BaseDados
@@ -341,6 +468,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
       setBaseDadosData(itemsOk);
 
       const structured = groupByHierarchy(itemsOk);
+      console.log('structured BaseDados', structured)
       setHierarchy(structured);
     } catch (error) {
       console.error("Erro ao buscar BaseDados", error);
@@ -829,12 +957,14 @@ Descrição: ${descricao ?? "Sem descrição"}.
     items.forEach((item) => {
       if (!item.diretriz) return;
       if (!map[item.diretriz]) {
+        const dirOriginal = items.find(d => d.id0 === item.diretriz);
+        if(!dirOriginal) {console.warn ('nao encontrou diretriz ', item.diretriz); return;}
         map[item.diretriz] = {
-          id: item.diretriz,
-          title: item.Title,
-          descricao: item.descricao,
+          id: dirOriginal?.id0 || item.diretriz,
+          title: dirOriginal.Title,
+          descricao: dirOriginal.descricao,
           temas: [],
-          extradata: item?.extradata ? JSON.parse(item.extradata) : null,
+          extradata: dirOriginal?.extradata ? JSON.parse(dirOriginal.extradata) : null,
         };
       }
       const diretriz = map[item.diretriz];
@@ -842,11 +972,16 @@ Descrição: ${descricao ?? "Sem descrição"}.
       if (item.tema) {
         let tema = diretriz.temas.find((t) => t.id === item.tema);
         if (!tema) {
+          const temaOriginal = items.find(d => d.id0?.trim() == item.tema?.trim());
+          
+          if(!temaOriginal) {
+            console.log(items.find(i => i.id0 === 'D2.4'));
+            console.warn ('nao encontrou temaOriginal ', item); return;}
           tema = {
-            id: item.tema,
-            title: item.Title,
+            id: temaOriginal.id0 || item.tema,
+            title: temaOriginal.Title,
             categorias: [],
-            descricao: item.descricao,
+            descricao: temaOriginal.descricao,
           };
           diretriz.temas.push(tema);
         }
@@ -854,11 +989,13 @@ Descrição: ${descricao ?? "Sem descrição"}.
         if (item.categoria) {
           let categoria = tema.categorias.find((c) => c.id === item.categoria);
           if (!categoria) {
+                      const categoriaOriginal = items.find(d => d.id0 === item.categoria);
+          if(!categoriaOriginal) {console.warn ('nao encontrou categoriaOriginal ', item.categoria); return;}
             categoria = {
-              id: item.categoria,
-              title: item.Title,
+              id: categoriaOriginal?.id0 || item.categoria,
+              title: categoriaOriginal.Title,
               kpis: [],
-              link: item.link,
+              link: categoriaOriginal.link,
             };
             tema.categorias.push(categoria);
           }
@@ -2007,10 +2144,9 @@ Descrição: ${descricao ?? "Sem descrição"}.
           context={context}
         />
       )}
-      {/* <Header
-        logoSrc={require("../../../assets/univesp-logo.png")}
-        context={context}
-      /> */}
+
+      <div className={styles.dashboardContainer}>
+
       {/* 🔍 Modo Pesquisa */}
       {isSearching ? (
         <div
@@ -2041,7 +2177,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
                   data.value as "diretrizes" | "favoritos" | "listas"
                 );
               }}
-              style={{ marginBottom: 10 }}
+              style={{ marginBottom: 10, marginTop: 20 }}
             >
               <Tab value="diretrizes">Diretrizes</Tab>
               <Tab value="favoritos">Favoritos</Tab>
@@ -2083,6 +2219,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
           {getContent()}
         </div>
       )}
+      </div>
 
       {/* {!isEditingGroup && !isSearching && renderUserGroupsMenu()} */}
     </div>

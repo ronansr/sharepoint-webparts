@@ -86,3 +86,8 @@ export const generateIdGrupo = (): string => {
 
   return `${ano}${mes}${dia}${hora}${minuto}${segundo}`;
 };
+
+export const getCleanModeFromUrl = (): boolean => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("cleanMode") === "true";
+};

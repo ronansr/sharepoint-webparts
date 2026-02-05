@@ -43,10 +43,10 @@ const Header: React.FC<HeaderProps> = ({
           src={logoSrc}
           alt={logoAlt}
           style={{
-            minHeight: 65,
-            maxHeight: 65,
+            minHeight: 45,
+            maxHeight: 45,
             objectFit: "contain",
-            paddingLeft: 5,
+            paddingLeft: 15,
           }}
         />
       </div>
@@ -56,7 +56,7 @@ const Header: React.FC<HeaderProps> = ({
         style={{
           //   width: 400,
           maxWidth: "100%",
-          padding: "0 24px",
+          padding: "0 29px",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",

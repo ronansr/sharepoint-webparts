@@ -150,10 +150,14 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
         <div key={node.id}>
           <div
             onClick={() => {
+              // seleciona se tiver link
               if (node.link) {
                 setSelected(node.id);
                 onSelect(node);
-              } else if (hasChildren) {
+              }
+
+              // expande/recolhe se tiver filhos
+              if (hasChildren) {
                 setExpanded((p) =>
                   p.includes(expansionKey)
                     ? p.filter((x) => x !== expansionKey)
@@ -299,7 +303,22 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
           maxHeight: 600,
         }}
       >
-        {isMenuOpen && renderTree(filteredData)}
+        {isMenuOpen && (
+          filteredData.length === 0 ? (
+            <div
+              style={{
+                padding: 16,
+                textAlign: "center",
+                color: "#666",
+                fontSize: 14,
+              }}
+            >
+              Nenhum item encontrado
+            </div>
+          ) : (
+            renderTree(filteredData)
+          )
+        )}
       </div>
     </div>
   );
