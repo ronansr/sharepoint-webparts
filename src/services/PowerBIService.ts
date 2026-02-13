@@ -37,68 +37,181 @@ export class PowerBIService {
   }
 
   /* ===================== EMBED ===================== */
+    public async embedReport(
+      context: WebPartContext,
+      embedUrl: string,
+      reportId: string,
+      paginaRelatorioBI?: string,
+      filtroKpiSelecionado?: string,
+      showHiddenPages?: (number | string)[]
+    ): Promise<void> {
+      try {
+        const container = this.getContainer();
 
-  public async embedReport(
-    context: WebPartContext,
-    embedUrl: string,
-    reportId: string,
-    paginaRelatorioBI?: string,
-    filtroKpiSelecionado?: string
-  ): Promise<void> {
-    try {
-      const container = this.getContainer();
+        if (!container) {
+          console.error(`❌ Container ${this.containerId} não encontrado`);
+          return;
+        }
 
-      if (!container) {
-        console.error(`❌ Container ${this.containerId} não encontrado`);
-        return;
-      }
+        this.powerbi.reset(container);
 
-      this.powerbi.reset(container);
+        const tokenProvider =
+          await context.aadTokenProviderFactory.getTokenProvider();
 
-      const tokenProvider =
-        await context.aadTokenProviderFactory.getTokenProvider();
+        const token = await tokenProvider.getToken(
+          "https://analysis.windows.net/powerbi/api"
+        );
 
-      const token = await tokenProvider.getToken(
-        "https://analysis.windows.net/powerbi/api"
-      );
-
-      const config: pbi.IEmbedConfiguration = {
-        type: "report",
-        embedUrl,
-        id: reportId,
-        accessToken: token,
-        tokenType: pbi.models.TokenType.Aad,
-        permissions: pbi.models.Permissions.Read,
-        settings: {
-          filterPaneEnabled: false,
-          navContentPaneEnabled: true,
-          layoutType: pbi.models.LayoutType.Custom,
-          customLayout: {
-            displayOption: pbi.models.DisplayOption.FitToPage,
+        const config: pbi.IEmbedConfiguration = {
+          type: "report",
+          embedUrl,
+          id: reportId,
+          accessToken: token,
+          tokenType: pbi.models.TokenType.Aad,
+          permissions: pbi.models.Permissions.Read,
+          settings: {
+            filterPaneEnabled: false,
+            navContentPaneEnabled: true,
+            layoutType: pbi.models.LayoutType.Custom,
+            customLayout: {
+              displayOption: pbi.models.DisplayOption.FitToPage,
+            },
           },
-        },
-      };
+        };
 
-      this.report = this.powerbi.embed(container, config) as pbi.Report;
+        this.report = this.powerbi.embed(container, config) as pbi.Report;
 
-      this.observeResize(container);
-      this.observeContainerLifecycle();
+        this.observeResize(container);
+        this.observeContainerLifecycle();
 
-      this.report.on("loaded", async () => {
-        this.isReportLoaded = true;
+        this.report.on("loaded", async () => {
+          this.isReportLoaded = true;
 
-        if (paginaRelatorioBI) {
-          await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
+          /* ===================== MOSTRAR PÁGINAS OCULTAS ===================== */
+          const test = [8]
+          showHiddenPages = test
+        if (showHiddenPages?.length) {
+          try {
+            const pages = await this.report!.getPages();
+
+            /* ===================== LOG DAS PÁGINAS ===================== */
+            console.group("📊 Power BI Pages");
+
+            pages.forEach((p, index) => {
+              console.log(
+                `Index: ${index} | Name: ${p.name} | Display: ${p.displayName} | Hidden: ${p.visibility}`
+              );
+            });
+
+            const hiddenPages = pages.filter(p => p.visibility == 1);
+
+            console.log("🔒 Páginas ocultas:", hiddenPages.map(p => p.displayName));
+
+            console.groupEnd();
+
+            /* ===================== REEXIBIR PÁGINAS ===================== */
+            for (const identifier of showHiddenPages) {
+              let page: pbi.Page | undefined;
+
+              if (typeof identifier === "number") {
+                const idx = identifier;
+                if (idx >= 0 && idx < pages.length) {
+                  page = pages[idx];
+                }
+              } else {
+                page = pages.find(p => p.name === identifier);
+              }
+
+              if (page) {
+                console.log(`👁️ Tornando página visível: ${page.displayName}`);
+                await (page as any).setVisibility(0);
+              } else {
+                console.warn("Página não encontrada:", identifier);
+              }
+            }
+
+          } catch (err) {
+            console.warn("Erro ao reexibir páginas ocultas", err);
+          }
         }
 
-        if (filtroKpiSelecionado) {
-          await this.applyKpiSlicerFilter(filtroKpiSelecionado);
-        }
-      });
-    } catch (error) {
-      console.warn("embedReport", error);
+
+          /* ===================== NAVEGAÇÃO ===================== */
+          if (paginaRelatorioBI) {
+            await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
+          }
+
+          /* ===================== FILTRO ===================== */
+          if (filtroKpiSelecionado) {
+            await this.applyKpiSlicerFilter(filtroKpiSelecionado);
+          }
+        });
+      } catch (error) {
+        console.warn("embedReport", error);
+      }
     }
-  }
+
+  // public async embedReport(
+  //   context: WebPartContext,
+  //   embedUrl: string,
+  //   reportId: string,
+  //   paginaRelatorioBI?: string,
+  //   filtroKpiSelecionado?: string
+  // ): Promise<void> {
+  //   try {
+  //     const container = this.getContainer();
+
+  //     if (!container) {
+  //       console.error(`❌ Container ${this.containerId} não encontrado`);
+  //       return;
+  //     }
+
+  //     this.powerbi.reset(container);
+
+  //     const tokenProvider =
+  //       await context.aadTokenProviderFactory.getTokenProvider();
+
+  //     const token = await tokenProvider.getToken(
+  //       "https://analysis.windows.net/powerbi/api"
+  //     );
+
+  //     const config: pbi.IEmbedConfiguration = {
+  //       type: "report",
+  //       embedUrl,
+  //       id: reportId,
+  //       accessToken: token,
+  //       tokenType: pbi.models.TokenType.Aad,
+  //       permissions: pbi.models.Permissions.Read,
+  //       settings: {
+  //         filterPaneEnabled: false,
+  //         navContentPaneEnabled: true,
+  //         layoutType: pbi.models.LayoutType.Custom,
+  //         customLayout: {
+  //           displayOption: pbi.models.DisplayOption.FitToPage,
+  //         },
+  //       },
+  //     };
+
+  //     this.report = this.powerbi.embed(container, config) as pbi.Report;
+
+  //     this.observeResize(container);
+  //     this.observeContainerLifecycle();
+
+  //     this.report.on("loaded", async () => {
+  //       this.isReportLoaded = true;
+
+  //       if (paginaRelatorioBI) {
+  //         await this.navigateToNavbarPageByIndex(paginaRelatorioBI);
+  //       }
+
+  //       if (filtroKpiSelecionado) {
+  //         await this.applyKpiSlicerFilter(filtroKpiSelecionado);
+  //       }
+  //     });
+  //   } catch (error) {
+  //     console.warn("embedReport", error);
+  //   }
+  // }
 
   /* ===================== NAVEGAÇÃO ===================== */
 

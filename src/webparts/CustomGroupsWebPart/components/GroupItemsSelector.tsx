@@ -8,6 +8,7 @@ import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 import { ISelectedGroupItem } from "./CustomGroups";
+import { filterHierarchyByPersona, groupByHierarchy, hierarchyToBaseDados } from "../../../utils";
 
 /**
  * 🔹 Props
@@ -65,9 +66,26 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
     setPage(1);
   }, [searchText]);
 
+
+    const getUserGroupsSharepoint = async () => {
+      console.log("buscando grupos do usuário");
+
+      const email = context.pageContext.user.email;
+
+      const groups = await sp.web.siteUsers.getByEmail(email).groups();
+
+      console.log("grupos que o usuário pertence", groups);
+
+      const groupTitles: string[] = groups.map((g: any) => String(g.Title));
+      console.log('groupTitles ', groupTitles)
+
+      return groupTitles;
+    };
+
   /* 📥 BaseDados */
   const loadItems = async (): Promise<void> => {
     try {
+      const userGroups = await getUserGroupsSharepoint();
       const list = sp.web.lists.getByTitle("BaseDados");
 
       const PAGE_SIZE = 100;
@@ -76,15 +94,31 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
       let batch: any[] = [];
 
       do {
-        batch = await list.items.top(PAGE_SIZE).skip(skip)();
+        batch = await list.items
+          .select(
+            "*",
+            // "ids_persona/Id",
+            "ids_persona/Title"
+          )
+          .expand("ids_persona")
+          .top(PAGE_SIZE)
+          .skip(skip)();
 
         allItems = allItems.concat(batch);
         skip += PAGE_SIZE;
       } while (batch.length === PAGE_SIZE);
 
-      const filtered = allItems.filter(
+      const hierarchy = groupByHierarchy(allItems)
+      const hierarchyPerfil = filterHierarchyByPersona(userGroups, hierarchy)
+      // console.log('hierarchyPerfil ',hierarchyPerfil)
+
+      const baseDadosPerfil = hierarchyToBaseDados(hierarchyPerfil)
+      // console.log('baseDadosPerfil ',baseDadosPerfil?.length, ' allItems ',allItems?.length)
+      // console.log('baseDadosPerfil ',baseDadosPerfil)
+      
+      const filtered = baseDadosPerfil.filter(
         (i) =>
-          !i.esconderNoMenu && i.link && i.link.Url && i.link.Url.trim() !== ""
+          !i.esconderNoMenu && i.link && i.link?.Url && i.link?.Url.trim() !== ""
       );
 
       // 🔒 Ordem fixa: favoritos primeiro, depois alfabética

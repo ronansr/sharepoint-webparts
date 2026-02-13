@@ -11,6 +11,8 @@ import { WebPartContext } from "@microsoft/sp-webpart-base";
 import { generateIdGrupo } from "../../../utils";
 import { SPFI, spfi } from "@pnp/sp";
 import { SPBrowser } from "@pnp/sp";
+import { Dropdown, IDropdownOption } from "@fluentui/react";
+
 
 export interface ISelectedGroupItem {
   idItem: string;
@@ -36,6 +38,10 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
   >([]);
   const [saving, setSaving] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [personasOptions, setPersonasOptions] = React.useState<IDropdownOption[]>([]);
+  const [selectedPersonas, setSelectedPersonas] = React.useState<number[]>([]);
+  const [userGroups, setUserGroups] = React.useState<string[] | null>(null);
+
 
   const canSave = !!groupName.trim() && selectedItems.length > 0 && !saving;
 
@@ -51,6 +57,16 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
     }
   }, [idGrupoSelecionado]);
 
+  React.useEffect(() => {
+    getUserGroupsSharepoint();
+  }, []);
+
+  React.useEffect(() => {
+    if (userGroups?.length) {
+      loadPersonas();
+    }
+  }, [userGroups]);
+
   const loadGroup = async (idGrupo: number): Promise<void> => {
     try {
       const email = context.pageContext.user.email;
@@ -63,7 +79,8 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
           "idItem",
           "privado",
           "nomeGrupo",
-          "descricao" // 🆕
+          "descricao", // 🆕
+          'ids_personaId'
         )();
 
       if (!items.length) return;
@@ -71,6 +88,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
       setGroupName(items[0].nomeGrupo);
       setGroupDescription(items[0].descricao ?? ""); // 🆕
       setIsPublic(!items[0].privado);
+      setSelectedPersonas(items[0]?.ids_personaId ?? [])
 
       setSelectedItems(
         items.map((i) => ({
@@ -83,7 +101,41 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
     }
   };
 
-  /* 💾 Criar / salvar lista */
+  const getUserGroupsSharepoint = async () => {
+    console.log("buscando grupos do usuário");
+
+    const email = context.pageContext.user.email;
+
+    const groups = await sp.web.siteUsers.getByEmail(email).groups();
+
+    console.log("grupos que o usuário pertence", groups);
+
+    const groupTitles: string[] = groups.map((g: any) => String(g.Title));
+    console.log('groupTitles ', groupTitles)
+
+    await setUserGroups(groupTitles?.length ? groupTitles : []);
+
+    return;
+  };
+
+  const loadPersonas = async (): Promise<void> => {
+    try {
+      const items = await sp.web.lists
+        .getByTitle("Personas")
+        .items.select("Id", "Title", "id_persona")();
+
+      const options: IDropdownOption[] = items.map((i) => ({
+        key: i.Id, // 👈 usar Id real do item
+        text: i.Title,
+      }));
+
+      setPersonasOptions(options);
+    } catch (err) {
+      console.error("Erro ao carregar personas", err);
+    }
+  };
+
+
   const saveGroup = async (): Promise<void> => {
     if (savingRef.current) return;
 
@@ -101,22 +153,33 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
       }
 
       for (const item of selectedItems) {
-        await sp.web.lists.getByTitle("UsuarioListas").items.add({
+        const itemSave: any = {
           Title: item.title,
           email,
           addDate,
           privado: !isPublic,
           nomeGrupo: groupName,
-          descricao: groupDescription, // 🆕
+          descricao: groupDescription,
           idGrupo,
           idItem: item.idItem,
           nomeAutor: name,
-        });
+        };
+
+        if (selectedPersonas?.length && !isPublic) {
+          itemSave.ids_personaId = selectedPersonas;
+        }
+
+        console.log("Salvando:", itemSave);
+
+        await sp.web.lists
+          .getByTitle("UsuarioListas")
+          .items.add(itemSave);
       }
 
       setTimeout(() => {
         onClose?.();
-      }, 2000);
+      }, 1500);
+
     } catch (error) {
       console.error("Erro ao salvar lista", error);
       alert("Erro ao salvar a lista");
@@ -206,7 +269,28 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
           checked={isPublic}
           onChange={(_, checked) => setIsPublic(!!checked)}
         />
+
+        {/* 🆕 Personas */}
+        {!isPublic && personasOptions?.length && <Dropdown
+          placeholder="Selecionar personas"
+          multiSelect
+          options={personasOptions}
+          selectedKeys={selectedPersonas}
+          onChange={(_, option) => {
+            if (!option) return;
+
+            const key = option.key as number;
+
+            setSelectedPersonas((prev) =>
+              option.selected
+                ? [...prev, key]
+                : prev.filter((k) => k !== key)
+            );
+          }}
+          styles={{ dropdown: { width: 200 } }}
+        />}
       </Stack>
+
 
       {/* 🆕 Descrição */}
       <input

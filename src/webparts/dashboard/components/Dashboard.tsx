@@ -5,6 +5,8 @@ import { SPBrowser } from "@pnp/sp";
 import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
+import "@pnp/sp/site-users/web";
+import "@pnp/sp/site-groups/web";
 import SectorCard from "./SectorCard";
 import {
   ChevronLeft20Filled,
@@ -16,7 +18,7 @@ import {
 import MultiLevelMenu, { IGenericNode } from "./MultiLeveMenu";
 import { PowerBIService } from "../../../services/PowerBIService";
 import { WebPartContext } from "@microsoft/sp-webpart-base";
-import { extractReportId, filterHierarchy, getCleanModeFromUrl } from "../../../utils";
+import { extractReportId, filterHierarchy, filterHierarchyByPersona, getCleanModeFromUrl, groupByHierarchy } from "../../../utils";
 import { TabList, Tab } from "@fluentui/react-components";
 import { Edit20Regular } from "@fluentui/react-icons";
 import CustomGroups from "../../CustomGroupsWebPart/components/CustomGroups";
@@ -49,6 +51,9 @@ interface BaseDados {
   kpis?: any[];
   kpisId?: any[];
   [key: string]: any;
+  ids_personaId?: string[];
+  ids_persona?: {Title: string}[];
+
 }
 export interface UsuarioListaItem {
   Id: number;
@@ -60,6 +65,8 @@ export interface UsuarioListaItem {
   nomeAutor?: string;
   descricao?: string;
   updateDate?: string;
+  privado?: boolean;
+  ids_persona?: any
 }
 
 const Dashboard: React.FC<IDashboardProps> = ({
@@ -102,6 +109,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
   const [showAllKpisMenu, setShowAllKpisMenu] = useState(false);
   const [allKpisMenuData, setAllKpisMenuData] = useState<IGenericNode[]>([]);
   const [enableCleanLayoutURL, setEnableCleanLayoutURL] = React.useState<boolean>(true);
+  const [userGroups, setUserGroups] = React.useState<string[] | null>(null);
 
   const sp: SPFI = spfi().using(SPBrowser({ baseUrl: siteUrl }));
   // const powerBIServiceRef = React.useRef<PowerBIService | null>(null);
@@ -261,9 +269,14 @@ const Dashboard: React.FC<IDashboardProps> = ({
     return () => style.remove();
   }, [additionalCss]);
 
-  useEffect(() => {
-    loadBaseDados();
+    useEffect(() => {
+    getUserGroupsSharepoint()
+  
   }, []);
+
+  useEffect(() => {
+      if(userGroups !== null) loadBaseDados();
+  }, [userGroups]);
 
   useEffect(() => {
     if (activeTab === "favoritos") loadFavoritos();
@@ -441,39 +454,131 @@ const Dashboard: React.FC<IDashboardProps> = ({
   //   }
   // };
 
+  const isUserInGroup = async (groupName: string): Promise<boolean> => {
+    console.log('buscando grupos do usuário')
+
+    const email = context.pageContext.user.email;
+
+    const groups = await sp.web.siteUsers.getByEmail(email).groups();
+    // const groups = await sp.web.siteUsers.getById(user.Id).groups();
+
+    console.log('grupos que o usuário pertence', groups)
+
+    return groups.some((g) => g.Title === groupName);
+  };
+
+  const getUserGroupsSharepoint = async () => {
+    console.log("buscando grupos do usuário");
+
+    const email = context.pageContext.user.email;
+
+    const groups = await sp.web.siteUsers.getByEmail(email).groups();
+
+    console.log("grupos que o usuário pertence", groups);
+
+    const groupTitles: string[] = groups.map((g: any) => String(g.Title));
+    console.log('groupTitles ', groupTitles)
+
+    await setUserGroups(groupTitles?.length ? groupTitles : []);
+
+    return;
+  };
+
   const loadBaseDados = async () => {
     try {
       const list = sp.web.lists.getByTitle("BaseDados");
 
       const PAGE_SIZE = 100;
-      let allItems: BaseDados[] = [];
+      let allItems: any[] = [];
       let skip = 0;
-      let batch: BaseDados[] = [];
+      let batch: any[] = [];
 
       do {
-        batch = await list.items.top(PAGE_SIZE).skip(skip)(); // 🔑 sem .select → todas as colunas
+        batch = await list.items
+          .select(
+            "*",
+            // "ids_persona/Id",
+            "ids_persona/Title"
+          )
+          .expand("ids_persona")
+          .top(PAGE_SIZE)
+          .skip(skip)();
 
         allItems = allItems.concat(batch);
         skip += PAGE_SIZE;
       } while (batch.length === PAGE_SIZE);
 
-      console.log("items", allItems);
+      // 🔥 Normaliza ids_persona para sempre virar array de objetos { Id, Title }
+      const normalizedItems: BaseDados[] = allItems.map((item) => ({
+        ...item,
+        ids_persona: item.ids_persona
+          ? item.ids_persona.map((p: any) => ({
+              Id: p.Id,
+              Title: p.Title,
+            }))
+          : [],
+      }));
 
-      const itemsOk = allItems
+      const itemsOk = normalizedItems
         .filter((item) => item.status)
         .sort((a, b) =>
           a.Title.localeCompare(b.Title, "pt-BR", { sensitivity: "base" })
         );
 
+      // console.log("Base de dados", itemsOk);
+
       setBaseDadosData(itemsOk);
 
       const structured = groupByHierarchy(itemsOk);
-      console.log('structured BaseDados', structured)
-      setHierarchy(structured);
+
+      const structuredByPersonaAccess = filterHierarchyByPersona(
+        userGroups ?? [],
+        structured
+      );
+
+      setHierarchy(structuredByPersonaAccess);
+
     } catch (error) {
       console.error("Erro ao buscar BaseDados", error);
     }
   };
+
+  // const loadBaseDados = async () => {
+  //   try {
+  //     const list = sp.web.lists.getByTitle("BaseDados");
+
+  //     const PAGE_SIZE = 100;
+  //     let allItems: BaseDados[] = [];
+  //     let skip = 0;
+  //     let batch: BaseDados[] = [];
+
+  //     do {
+  //       batch = await list.items.top(PAGE_SIZE).skip(skip)(); // 🔑 sem .select → todas as colunas
+
+  //       allItems = allItems.concat(batch);
+  //       skip += PAGE_SIZE;
+  //     } while (batch.length === PAGE_SIZE);
+
+  //     // console.log("items", allItems);
+
+  //     const itemsOk = allItems
+  //       .filter((item) => item.status)
+  //       .sort((a, b) =>
+  //         a.Title.localeCompare(b.Title, "pt-BR", { sensitivity: "base" })
+  //       );
+
+  //     console.log('Base de dados',itemsOk)
+  //     setBaseDadosData(itemsOk);
+
+  //     const structured = groupByHierarchy(itemsOk);
+  //     console.log('userGroups',userGroups)
+  //     const structuredByPersonaAccess = filterHierarchyByPersona(userGroups ?? [], structured)
+  //     console.log('structuredByPersonaAccess', structuredByPersonaAccess)
+  //     setHierarchy(structuredByPersonaAccess);
+  //   } catch (error) {
+  //     console.error("Erro ao buscar BaseDados", error);
+  //   }
+  // };
 
   // ------------------------------
   // Carregar Favoritos - CORRIGIDO
@@ -624,6 +729,8 @@ const Dashboard: React.FC<IDashboardProps> = ({
           item.idGrupo !== 2
       );
 
+      console.log('gruposRaw', gruposRaw)
+
       if (gruposRaw.length === 0) {
         setUserGroupsMenu([]);
         return;
@@ -669,6 +776,7 @@ const Dashboard: React.FC<IDashboardProps> = ({
       setUserGroupsMenu([]);
     }
   };
+
   const loadFavoriteSharedGroups = async (): Promise<string[]> => {
     try {
       const currentUserEmail = context.pageContext.user.email;
@@ -739,76 +847,93 @@ Descrição: ${descricao ?? "Sem descrição"}.
   };
 
   const loadSharedGroups = async () => {
-    try {
-      const currentUserEmail = context.pageContext.user.email;
+  try {
+    const currentUserEmail = context.pageContext.user.email;
 
-      // 🔹 1. Grupos compartilhados (como já funciona)
-      const gruposRaw: UsuarioListaItem[] = await sp.web.lists
-        .getByTitle("UsuarioListas")
-        .items.select(
-          "Id",
-          "Title",
-          "idItem",
-          "idGrupo",
-          "nomeGrupo",
-          "email",
-          "privado",
-          "descricao",
-          "updateDate",
-          "nomeAutor"
-        )
-        .filter(
-          `email ne '${currentUserEmail}' and privado eq false and idGrupo ne 1`
-        )();
+    const gruposRaw: UsuarioListaItem[] = await sp.web.lists
+      .getByTitle("UsuarioListas")
+      .items
+      .select(
+        "Id",
+        "Title",
+        "idItem",
+        "idGrupo",
+        "nomeGrupo",
+        "email",
+        "privado",
+        "descricao",
+        "updateDate",
+        "nomeAutor",
+        "ids_persona/Id",
+        "ids_persona/Title"
+      )
+      .expand("ids_persona")
+      .filter(`email ne '${currentUserEmail}' and idGrupo ne 1`)();
 
-      const favoriteGroupIds = await loadFavoriteSharedGroups();
+    /*
+      🔥 NOVA REGRA DE VISIBILIDADE
+    */
+    const gruposVisiveis = gruposRaw.filter((item) => {
+      // público continua visível
+      if (!item.privado) return true;
 
-      // 🔹 2. Agrupar por idGrupo
-      const grouped: Record<
-        string,
-        { nomeGrupo: string; items: UsuarioListaItem[] }
-      > = {};
+      // privado → verificar personas
+      if (!item.ids_persona?.length) return false;
 
-      gruposRaw.forEach((item) => {
-        if (!grouped[item.idGrupo]) {
-          grouped[item.idGrupo] = {
-            nomeGrupo: item.nomeGrupo || "Grupo compartilhado",
-            items: [],
-          };
-        }
-        grouped[item.idGrupo].items.push(item);
-      });
+      const personaTitles = item.ids_persona.map((p: any) => p.Title);
 
-      const menu: IGenericNode[] = Object.entries(grouped).map(
-        ([idGrupo, group]) => ({
-          id: idGrupo,
-          title: group.nomeGrupo,
-          showChildren: true,
+      return personaTitles.some((p: string) =>
+        userGroups?.includes(p)
+      );
+    });
+
+    const favoriteGroupIds = await loadFavoriteSharedGroups();
+
+    const grouped: Record<
+      string,
+      { nomeGrupo: string; items: UsuarioListaItem[] }
+    > = {};
+
+    gruposVisiveis.forEach((item) => {
+      if (!grouped[item.idGrupo]) {
+        grouped[item.idGrupo] = {
+          nomeGrupo: item.nomeGrupo || "Grupo compartilhado",
+          items: [],
+        };
+      }
+      grouped[item.idGrupo].items.push(item);
+    });
+
+    const menu: IGenericNode[] = Object.entries(grouped).map(
+      ([idGrupo, group]) => ({
+        id: idGrupo,
+        title: group.nomeGrupo,
+        showChildren: true,
+        data: {
+          idGrupo: Number(idGrupo),
+          shared: true,
+          isFavorited: favoriteGroupIds.includes(idGrupo),
+          iconComponent: buildInfoIcon(
+            group?.items[0]?.nomeAutor,
+            group?.items[0]?.email,
+            group?.items[0]?.descricao,
+            group?.items[0]?.updateDate
+          ),
+        },
+        children: group.items.map((i) => ({
+          id: i.idItem!,
+          title: i.Title,
+          link: i.idItem,
           data: {
             idGrupo: Number(idGrupo),
             shared: true,
-            isFavorited: favoriteGroupIds.includes(idGrupo),
-            iconComponent: buildInfoIcon(
-              group?.items[0]?.nomeAutor,
-              group?.items[0]?.email,
-              group?.items[0]?.descricao,
-              group?.items[0]?.updateDate
-            ),
+            ...baseDadosData?.find((item) => item.id0 === i.idItem),
           },
-          children: group.items.map((i) => ({
-            id: i.idItem!,
-            title: i.Title,
-            link: i.idItem,
-            data: {
-              idGrupo: Number(idGrupo),
-              shared: true,
-              ...baseDadosData?.find((item) => item.id0 === i.idItem),
-            },
-          })),
-        })
-      );
+        })),
+      })
+    );
 
-      if (favoriteGroupIds.length > 0) {
+    if (favoriteGroupIds.length > 0) {
         const favoriteChildren = menu.filter((node) =>
           favoriteGroupIds.includes(node.id)
         );
@@ -829,14 +954,112 @@ Descrição: ${descricao ?? "Sem descrição"}.
         }
       }
 
-      console.log(menu);
+    setSharedGroupsMenu(menu);
+  } catch (error) {
+    console.error("Erro ao carregar grupos compartilhados", error);
+    setSharedGroupsMenu([]);
+  }
+};
 
-      setSharedGroupsMenu(menu);
-    } catch (error) {
-      console.error("Erro ao carregar grupos compartilhados", error);
-      setSharedGroupsMenu([]);
-    }
-  };
+  // const loadSharedGroups = async () => {
+  //   try {
+  //     const currentUserEmail = context.pageContext.user.email;
+
+  //     // 🔹 1. Grupos compartilhados (como já funciona)
+  //     const gruposRaw: UsuarioListaItem[] = await sp.web.lists
+  //       .getByTitle("UsuarioListas")
+  //       .items.select(
+  //         "Id",
+  //         "Title",
+  //         "idItem",
+  //         "idGrupo",
+  //         "nomeGrupo",
+  //         "email",
+  //         "privado",
+  //         "descricao",
+  //         "updateDate",
+  //         "nomeAutor"
+  //       )
+  //       .filter(
+  //         `email ne '${currentUserEmail}' and privado eq false and idGrupo ne 1`
+  //       )();
+
+  //     const favoriteGroupIds = await loadFavoriteSharedGroups();
+
+  //     // 🔹 2. Agrupar por idGrupo
+  //     const grouped: Record<
+  //       string,
+  //       { nomeGrupo: string; items: UsuarioListaItem[] }
+  //     > = {};
+
+  //     gruposRaw.forEach((item) => {
+  //       if (!grouped[item.idGrupo]) {
+  //         grouped[item.idGrupo] = {
+  //           nomeGrupo: item.nomeGrupo || "Grupo compartilhado",
+  //           items: [],
+  //         };
+  //       }
+  //       grouped[item.idGrupo].items.push(item);
+  //     });
+
+  //     const menu: IGenericNode[] = Object.entries(grouped).map(
+  //       ([idGrupo, group]) => ({
+  //         id: idGrupo,
+  //         title: group.nomeGrupo,
+  //         showChildren: true,
+  //         data: {
+  //           idGrupo: Number(idGrupo),
+  //           shared: true,
+  //           isFavorited: favoriteGroupIds.includes(idGrupo),
+  //           iconComponent: buildInfoIcon(
+  //             group?.items[0]?.nomeAutor,
+  //             group?.items[0]?.email,
+  //             group?.items[0]?.descricao,
+  //             group?.items[0]?.updateDate
+  //           ),
+  //         },
+  //         children: group.items.map((i) => ({
+  //           id: i.idItem!,
+  //           title: i.Title,
+  //           link: i.idItem,
+  //           data: {
+  //             idGrupo: Number(idGrupo),
+  //             shared: true,
+  //             ...baseDadosData?.find((item) => item.id0 === i.idItem),
+  //           },
+  //         })),
+  //       })
+  //     );
+
+  //     if (favoriteGroupIds.length > 0) {
+  //       const favoriteChildren = menu.filter((node) =>
+  //         favoriteGroupIds.includes(node.id)
+  //       );
+
+  //       if (favoriteChildren.length > 0) {
+  //         menu.unshift({
+  //           id: "favorite-shared",
+  //           title: "Acesso Rápido",
+  //           showChildren: true,
+  //           data: {
+  //             idGrupo: 2,
+  //             favoriteShared: true,
+  //             hideStar: true, // ⭐ não mostra estrela
+  //             iconComponent: <Library20Regular />, // 📚 ícone de biblioteca
+  //           },
+  //           children: favoriteChildren,
+  //         });
+  //       }
+  //     }
+
+  //     console.log(menu);
+
+  //     setSharedGroupsMenu(menu);
+  //   } catch (error) {
+  //     console.error("Erro ao carregar grupos compartilhados", error);
+  //     setSharedGroupsMenu([]);
+  //   }
+  // };
 
   const mapBaseDadosToKpi = (item: BaseDados): IKpi => {
     return {
@@ -952,73 +1175,111 @@ Descrição: ${descricao ?? "Sem descrição"}.
   // ------------------------------
   // Agrupamento Diretriz > Tema > Categoria
   // ------------------------------
-  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
-    const map: { [key: string]: IDiretriz } = {};
-    items.forEach((item) => {
-      if (!item.diretriz) return;
-      if (!map[item.diretriz]) {
-        const dirOriginal = items.find(d => d.id0 === item.diretriz);
-        if(!dirOriginal) {console.warn ('nao encontrou diretriz ', item.diretriz); return;}
-        map[item.diretriz] = {
-          id: dirOriginal?.id0 || item.diretriz,
-          title: dirOriginal.Title,
-          descricao: dirOriginal.descricao,
-          temas: [],
-          extradata: dirOriginal?.extradata ? JSON.parse(dirOriginal.extradata) : null,
-        };
-      }
-      const diretriz = map[item.diretriz];
+  // const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
+  //   const map: { [key: string]: IDiretriz } = {};
+  //   items.forEach((item) => {
+  //     if (!item.diretriz) return;
+  //     if (!map[item.diretriz]) {
+  //       const dirOriginal = items.find(d => d.id0 === item.diretriz);
+  //       if(!dirOriginal) {console.warn ('nao encontrou diretriz ', item.diretriz); return;}
+  //       map[item.diretriz] = {
+  //         id: dirOriginal?.id0 || item.diretriz,
+  //         title: dirOriginal.Title,
+  //         descricao: dirOriginal.descricao,
+  //         temas: [],
+  //         extradata: dirOriginal?.extradata ? JSON.parse(dirOriginal.extradata) : null,
+  //         ids_persona: dirOriginal?.ids_persona?.map(i => i.Title) || []
+  //       };
+  //     }
+  //     const diretriz = map[item.diretriz];
 
-      if (item.tema) {
-        let tema = diretriz.temas.find((t) => t.id === item.tema);
-        if (!tema) {
-          const temaOriginal = items.find(d => d.id0?.trim() == item.tema?.trim());
+  //     if (item.tema) {
+  //       let tema = diretriz.temas.find((t) => t.id === item.tema);
+  //       if (!tema) {
+  //         const temaOriginal = items.find(d => d.id0?.trim() == item.tema?.trim());
           
-          if(!temaOriginal) {
-            console.log(items.find(i => i.id0 === 'D2.4'));
-            console.warn ('nao encontrou temaOriginal ', item); return;}
-          tema = {
-            id: temaOriginal.id0 || item.tema,
-            title: temaOriginal.Title,
-            categorias: [],
-            descricao: temaOriginal.descricao,
-          };
-          diretriz.temas.push(tema);
-        }
+  //         if(!temaOriginal) {
+  //           console.log(items.find(i => i.id0 === 'D2.4'));
+  //           console.warn ('nao encontrou temaOriginal ', item); return;}
+  //         tema = {
+  //           id: temaOriginal.id0 || item.tema,
+  //           title: temaOriginal.Title,
+  //           categorias: [],
+  //           descricao: temaOriginal.descricao,
+  //           ids_persona: temaOriginal?.ids_persona?.map(i => i.Title) || []
 
-        if (item.categoria) {
-          let categoria = tema.categorias.find((c) => c.id === item.categoria);
-          if (!categoria) {
-                      const categoriaOriginal = items.find(d => d.id0 === item.categoria);
-          if(!categoriaOriginal) {console.warn ('nao encontrou categoriaOriginal ', item.categoria); return;}
-            categoria = {
-              id: categoriaOriginal?.id0 || item.categoria,
-              title: categoriaOriginal.Title,
-              kpis: [],
-              link: categoriaOriginal.link,
-            };
-            tema.categorias.push(categoria);
-          }
+  //         };
+  //         diretriz.temas.push(tema);
+  //       }
 
-          if (categoria && item.kpisId?.length) {
-            item.kpisId.forEach((kId: any) => {
-              const kpiData = items.find((i) => i.Id === kId);
-              if (
-                kpiData &&
-                !categoria?.kpis?.find((k) => k.id === kId.toString())
-              )
-                categoria?.kpis?.push({
-                  id: kId.toString(),
-                  title: kpiData.Title,
-                  ...kpiData,
-                });
-            });
-          }
-        }
-      }
-    });
-    return Object.values(map);
-  };
+  //       if (item.categoria) {
+  //         let categoria = tema.categorias.find((c) => c.id === item.categoria);
+  //         if (!categoria) {
+  //                     const categoriaOriginal = items.find(d => d.id0 === item.categoria);
+  //         if(!categoriaOriginal) {console.warn ('nao encontrou categoriaOriginal ', item.categoria); return;}
+  //           categoria = {
+  //             id: categoriaOriginal?.id0 || item.categoria,
+  //             title: categoriaOriginal.Title,
+  //             kpis: [],
+  //             link: categoriaOriginal.link,
+  //             ids_persona: categoriaOriginal?.ids_persona?.map(i => i.Title) || []
+
+  //           };
+  //           tema.categorias.push(categoria);
+  //         }
+
+  //         if (categoria && item.kpisId?.length) {
+  //           item.kpisId.forEach((kId: any) => {
+  //             const kpiData = items.find((i) => i.Id === kId);
+  //             if (
+  //               kpiData &&
+  //               !categoria?.kpis?.find((k) => k.id === kId.toString())
+  //             )
+  //               categoria?.kpis?.push({
+  //                 id: kId.toString(),
+  //                 title: kpiData.Title,
+  //                 ids_persona: kpiData?.ids_persona?.map(i => i.Title) || [],
+
+  //                 ...kpiData,
+  //               });
+  //           });
+  //         }
+  //       }
+  //     }
+  //   });
+  //   return Object.values(map);
+  // };
+
+  // const filterHierarchyByPersona = (
+  //   userPersonaIds: string[],
+  //   hierarchy: IDiretriz[]
+  // ): IDiretriz[] => {
+  //   const hasAccess = (ids_persona?: string[]) => {
+  //     if (!ids_persona || ids_persona.length === 0) return true;
+  //     return ids_persona.some(id => userPersonaIds.includes(id));
+  //   };
+
+  //   return hierarchy
+  //     .filter((diretriz) => hasAccess(diretriz.ids_persona))
+  //     .map((diretriz) => ({
+  //       ...diretriz,
+  //       temas: diretriz.temas
+  //         .filter((tema) => hasAccess(tema.ids_persona))
+  //         .map((tema) => ({
+  //           ...tema,
+  //           categorias: tema.categorias
+  //             .filter((categoria) => hasAccess(categoria.ids_persona))
+  //             .map((categoria) => ({
+  //               ...categoria,
+  //               kpis: categoria.kpis.filter((kpi) =>
+  //                 hasAccess(kpi.ids_persona)
+  //               ),
+  //             })),
+  //         })),
+  //     }));
+  // };
+
+
 
   // ------------------------------
   // Converter para menu
@@ -1642,7 +1903,8 @@ Descrição: ${descricao ?? "Sem descrição"}.
                 item.data.link.Url,
                 extractReportId(item.data.link.Url) ?? "",
                 item?.data?.paginaRelatorioBI,
-                item?.data?.filtroKpiSelecionado
+                item?.data?.filtroKpiSelecionado,
+                [1,2]
               );
           }}
           menuVisible={menuVisible}

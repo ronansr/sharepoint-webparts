@@ -17,4 +17,10 @@ export interface BaseDados {
   link?: string; // Link (se existir)
 
   updated?: string; // Data de atualização (ISO string)
+
+  kpisId?: any[];
+  [key: string]: any;
+  ids_personaId?: string[];
+  ids_persona?: {Title: string}[];
 }
+

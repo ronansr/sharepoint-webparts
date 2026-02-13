@@ -1,6 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
-  "id": "1bfc974b-ddc4-4849-961a-82afdc612fd9",
+  "id": "1bfc974b-ddc4-4849-961a-82afdc612fd7",
   "alias": "DashboardWebPart",
   "componentType": "WebPart",
   "version": "*",
@@ -17,7 +17,7 @@
     {
       "groupId": "5c03119e-3074-46fd-976b-c60198311f71",
       "group": { "default": "Advanced" },
-      "title": { "default": "DashboardWebPartDev" },
+      "title": { "default": "DashboardSiteV2" },
       "description": { "default": "dashboard description" },
       "officeFabricIconFontName": "List",
       "properties": {
