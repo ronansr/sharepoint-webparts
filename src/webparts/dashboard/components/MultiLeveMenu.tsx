@@ -136,6 +136,12 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
     hasInitializedExpansion.current = true;
   }, [filteredData, initialExpanded]);
 
+  useEffect(() => {
+    if (search.trim()) {
+      setExpanded(getAllExpandableIds(filteredData));
+    }
+  }, [search, filteredData]);
+
   /** 🧱 Renderização */
   const renderTree = (nodes: IGenericNode[], level = 0, parentPath = "") =>
     nodes.map((node) => {
@@ -147,7 +153,7 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
       const isSelected = selected === node.id;
 
       return (
-        <div key={node.id}>
+        <div key={expansionKey}>
           <div
             onClick={() => {
               // seleciona se tiver link
@@ -295,6 +301,7 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
       )}
 
       <div
+        key={`tree-${search}-${onlyValidated}`}
         style={{
           flex: 1,
           overflowY: "auto",
