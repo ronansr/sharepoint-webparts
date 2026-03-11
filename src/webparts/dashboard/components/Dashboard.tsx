@@ -1755,19 +1755,34 @@ Descrição: ${descricao ?? "Sem descrição"}.
     );
   };
 
-  const renderTemas = (data: IDiretriz[]) =>
-    selectedDiretriz?.temas.map((t) => (
-      <SectorCard
-        key={t.id}
-        id={t.id}
-        title={t.title}
-        description={t.descricao}
-        onClick={() => setSelectedTema(t)}
-        onStarClick={() => onClickFavorite(t)}
-        context={context}
-        siteUrl={siteUrl}
-      />
-    ));
+const renderTemas = (data: IDiretriz[]): any => (
+  <div style={{ display: 'flex', flexDirection: 'column', width: '100%'}}>
+    <div
+      style={{
+        fontSize: 20,
+        fontWeight: 600,
+        marginBottom: 12,
+      }}
+    >
+      Temas
+    </div>
+
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+      {selectedDiretriz?.temas?.map((t) => (
+        <SectorCard
+          key={t.id}
+          id={t.id}
+          title={t.title}
+          description={t.descricao}
+          onClick={() => setSelectedTema(t)}
+          onStarClick={() => onClickFavorite(t)}
+          context={context}
+          siteUrl={siteUrl}
+        />
+      ))}
+    </div>
+  </div>
+);
   const renderCategorias = (data: IDiretriz[]) => {
     if (!selectedTema) return null;
     const menuData = convertToMenuTree(selectedTema);
