@@ -61,7 +61,11 @@ const SectorCard: React.FC<ISectorCardProps> = ({
         boxSizing: "border-box",
         display: "flex",
         flexDirection: "column",
-        width: 320,
+
+        flex: "1 1 calc(33.333% - 12px)",   // ✅ ocupa até 1/3
+        maxWidth: "calc(33.333% - 12px)",  // ✅ limita a 1/3
+        minWidth: "calc(33.333% - 12px)", // 260,                     // ✅ evita ficar pequeno demais
+
         minHeight: 200,
         height: 260,
         border: "1px solid #A3A3A3",

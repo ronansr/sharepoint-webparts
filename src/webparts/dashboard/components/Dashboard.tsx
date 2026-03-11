@@ -1736,7 +1736,7 @@ Descrição: ${descricao ?? "Sem descrição"}.
               id="reportContainerKPIs"
               style={{
                 flex: 1,
-                minHeight: 650,
+                minHeight: 600,
                 padding: 5,
                 border: "1px solid #ccd",
                 borderRadius: 8,
@@ -1755,34 +1755,34 @@ Descrição: ${descricao ?? "Sem descrição"}.
     );
   };
 
-const renderTemas = (data: IDiretriz[]): any => (
-  <div style={{ display: 'flex', flexDirection: 'column', width: '100%'}}>
-    <div
-      style={{
-        fontSize: 20,
-        fontWeight: 600,
-        marginBottom: 12,
-      }}
-    >
-      Temas
-    </div>
+  const renderTemas = (data: IDiretriz[]): any => (
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%'}}>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 600,
+          marginBottom: 12,
+        }}
+      >
+        Temas
+      </div>
 
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-      {selectedDiretriz?.temas?.map((t) => (
-        <SectorCard
-          key={t.id}
-          id={t.id}
-          title={t.title}
-          description={t.descricao}
-          onClick={() => setSelectedTema(t)}
-          onStarClick={() => onClickFavorite(t)}
-          context={context}
-          siteUrl={siteUrl}
-        />
-      ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        {selectedDiretriz?.temas?.map((t) => (
+          <SectorCard
+            key={t.id}
+            id={t.id}
+            title={t.title}
+            description={t.descricao}
+            onClick={() => setSelectedTema(t)}
+            onStarClick={() => onClickFavorite(t)}
+            context={context}
+            siteUrl={siteUrl}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
   const renderCategorias = (data: IDiretriz[]) => {
     if (!selectedTema) return null;
     const menuData = convertToMenuTree(selectedTema);
@@ -1867,7 +1867,7 @@ const renderTemas = (data: IDiretriz[]): any => (
               // key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
               style={{
                 flex: 1,
-                minHeight: 650,
+                minHeight: 600,
                 padding: 5,
                 border: "1px solid #ccd",
                 borderRadius: 8,
@@ -1905,7 +1905,52 @@ const renderTemas = (data: IDiretriz[]): any => (
     }
     const menuData = convertHierarchyListToMenuTree(data);
     return (
-      <div style={{ display: "flex", width: "100%", gap: 5 }} key={"favs"}>
+      <div style={{ display: "flex", width: "100%", gap: 5, flexDirection: 'column' }} key={"favs"}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 20,
+            fontSize: 14,
+            borderTopWidth: 1,
+            borderColor: "black",
+            
+          }}
+        >
+          <div
+            onClick={() => {
+              setActiveTab('diretrizes')
+              setSelectedTema(null);
+              setSelectedDiretriz(null);
+            }}
+            style={{
+              cursor: "pointer",
+              padding: 6,
+              borderRadius: 6,
+              background: "#eee",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <ChevronLeft20Filled color="black" />
+          </div>
+        <span
+          style={{
+            cursor: "pointer",
+            fontWeight: !selectedDiretriz ? "bold" : "normal",
+          }}
+          onClick={() => {
+            setActiveTab('diretrizes')
+            setSelectedTema(null);
+            setSelectedDiretriz(null);
+          }}
+        >
+          Voltar
+        </span>
+      </div>
+        <div style={{ display: "flex", width: "100%"}}>
+
         <MultiLevelMenu
           data={menuData}
           onSelect={(item) => {
@@ -1927,7 +1972,7 @@ const renderTemas = (data: IDiretriz[]): any => (
           showToggleOnlyValidates
           expandAll={false}
         />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, marginLeft: 5 }}>
           {selectedKpiData && (
             <div
               style={{
@@ -1989,7 +2034,7 @@ const renderTemas = (data: IDiretriz[]): any => (
             key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
-              minHeight: 650,
+              minHeight: 600,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
@@ -2007,6 +2052,8 @@ const renderTemas = (data: IDiretriz[]): any => (
             )}
           </div>
         </div>
+        </div>
+
       </div>
     );
   };
@@ -2163,7 +2210,7 @@ const renderTemas = (data: IDiretriz[]): any => (
             // key={`${activeTab}-${selectedGroupKpiData?.id ?? "empty"}`}
             style={{
               flex: 1,
-              minHeight: 650,
+              minHeight: 600,
               padding: 5,
               border: "1px solid #ccd",
               borderRadius: 8,
@@ -2194,6 +2241,49 @@ const renderTemas = (data: IDiretriz[]): any => (
     return (
       <div style={{ marginTop: 10 }}>
         {/* 🔹 HEADER COM TABS + BOTÃO */}
+                <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 20,
+            fontSize: 14,
+            borderTopWidth: 1,
+            borderColor: "black",
+            
+          }}
+        >
+          <div
+            onClick={() => {
+              setActiveTab('diretrizes')
+              setSelectedTema(null);
+              setSelectedDiretriz(null);
+            }}
+            style={{
+              cursor: "pointer",
+              padding: 6,
+              borderRadius: 6,
+              background: "#eee",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <ChevronLeft20Filled color="black" />
+          </div>
+        <span
+          style={{
+            cursor: "pointer",
+            fontWeight: !selectedDiretriz ? "bold" : "normal",
+          }}
+          onClick={() => {
+            setActiveTab('diretrizes')
+            setSelectedTema(null);
+            setSelectedDiretriz(null);
+          }}
+        >
+          Voltar
+        </span>
+      </div>
         <div
           style={{
             display: "flex",
@@ -2355,7 +2445,7 @@ const renderTemas = (data: IDiretriz[]): any => (
                   flex: 1,
                   width: "100%",
                   height: "100%",
-                  minHeight: 650, // 🔑 MUITO importante
+                  minHeight: 600, // 🔑 MUITO importante
                   // padding: 5,
                   border: "1px solid #ccd",
                   borderRadius: 8,
@@ -2409,6 +2499,17 @@ const renderTemas = (data: IDiretriz[]): any => (
     return renderCategorias(data);
   };
 
+  const onClickImageToInitialPage = () => {
+    setSelectedDiretriz(null);
+    setSelectedTema(null);
+    setActiveTab('diretrizes');
+    setSelectedKpiData(null)
+    setSelectedItemLink(null)
+    setSelectedGroupKpiData(null)
+    setIdGrupoSelecionado(null)
+    setSearchText('')
+  }
+
   const isSearching = !!searchText && searchText.trim().length > 0;
   // ------------------------------
   // Render Principal
@@ -2419,6 +2520,7 @@ const renderTemas = (data: IDiretriz[]): any => (
         <Header
           logoSrc={require("../../../assets/univesp-logo.png")}
           context={context}
+          onClickImage={onClickImageToInitialPage}
         />
       )}
 

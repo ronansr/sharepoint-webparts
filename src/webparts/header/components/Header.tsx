@@ -8,7 +8,7 @@ interface HeaderProps {
   logoSrc: string;
   logoAlt?: string;
   context: WebPartContext;
-
+  onClickImage?: any
   //   onSearch?: (value: string) => void;
 }
 
@@ -16,6 +16,7 @@ const Header: React.FC<HeaderProps> = ({
   logoSrc,
   logoAlt = "Logo",
   context,
+  onClickImage
   //   onSearch,
 }) => {
   return (
@@ -38,6 +39,7 @@ const Header: React.FC<HeaderProps> = ({
           alignItems: "center",
           height: "100%",
         }}
+        onClick={onClickImage}
       >
         <img
           src={logoSrc}

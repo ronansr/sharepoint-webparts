@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useState } from "react";
 import styles from "../SearchWebPart.module.scss";
-import { Search20Regular } from "@fluentui/react-icons";
+import { Search20Regular, BinFull20Regular } from "@fluentui/react-icons";
 
 const SEARCH_EVENT = "dashboard-search";
 
@@ -11,6 +11,17 @@ const Search: React.FC = () => {
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value;
+    setValue(text);
+
+    window.dispatchEvent(
+      new CustomEvent(SEARCH_EVENT, {
+        detail: { text },
+      })
+    );
+  };
+
+  const onClear = () => {
+    const text = ''
     setValue(text);
 
     window.dispatchEvent(
@@ -54,7 +65,9 @@ const Search: React.FC = () => {
           }}
         />
 
-        <Search20Regular color={isFocused ? "#000" : "#333"} />
+        {value 
+          ? <span style={{color: isFocused ? "#000" : "#333", fontWeight: 'bold'}} onClick={onClear}>X</span> 
+          : <Search20Regular color={isFocused ? "#000" : "#333"} />}
       </div>
     </div>
   );
