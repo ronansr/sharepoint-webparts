@@ -22,5 +22,7 @@ export interface BaseDados {
   [key: string]: any;
   ids_personaId?: string[];
   ids_persona?: {Title: string}[];
+  ordemExibicao?: number;
+  kpiAlerta?: boolean;
 }
 

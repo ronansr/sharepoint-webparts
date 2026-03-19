@@ -1316,18 +1316,34 @@ Descrição: ${descricao ?? "Sem descrição"}.
   };
 
   const buildAllKpisMenu = (): IGenericNode[] => {
-    return baseDadosData
+    const uniqueMap = new Map<string, IGenericNode>();
+
+    baseDadosData
       .filter(
         (item) =>
           !!item.link && // tem link
           !item.categoria // NÃO tem categoria
       )
-      .map((item) => ({
-        id: item.id0 || item.Id.toString(),
-        title: item.Title,
-        link: item.id0 || item.Id.toString(),
-        data: item,
-      }));
+      .forEach((item) => {
+        const key = item.id0 || item.Id.toString();
+
+        // 🔒 evita duplicados
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            id: key,
+            title: item.Title,
+            link: key,
+            data: item,
+          });
+        }
+      });
+
+    // 🔤 ordenação alfabética (pt-BR)
+    return Array.from(uniqueMap.values()).sort((a, b) =>
+      a.title.localeCompare(b.title, "pt-BR", {
+        sensitivity: "base",
+      })
+    );
   };
 
   const handleShowAllKpis = () => {

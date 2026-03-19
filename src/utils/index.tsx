@@ -107,7 +107,9 @@ export  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
           descricao: dirOriginal.descricao,
           temas: [],
           extradata: dirOriginal?.extradata ? JSON.parse(dirOriginal.extradata) : null,
-          ids_persona: dirOriginal?.ids_persona?.map(i => i.Title) || []
+          ids_persona: dirOriginal?.ids_persona?.map(i => i.Title) || [],
+          ordemExibicao: dirOriginal?.ordemExibicao || 0,
+          kpiAlerta: dirOriginal?.kpiAlerta || false
         };
       }
       const diretriz = map[item.diretriz];
@@ -125,7 +127,9 @@ export  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
             title: temaOriginal.Title,
             categorias: [],
             descricao: temaOriginal.descricao,
-            ids_persona: temaOriginal?.ids_persona?.map(i => i.Title) || []
+            ids_persona: temaOriginal?.ids_persona?.map(i => i.Title) || [],
+            ordemExibicao: temaOriginal?.ordemExibicao || 0,
+            kpiAlerta: temaOriginal?.kpiAlerta || false
 
           };
           diretriz.temas.push(tema);
@@ -141,7 +145,10 @@ export  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
               title: categoriaOriginal.Title,
               kpis: [],
               link: categoriaOriginal.link,
-              ids_persona: categoriaOriginal?.ids_persona?.map(i => i.Title) || []
+              ids_persona: categoriaOriginal?.ids_persona?.map(i => i.Title) || [],
+              ordemExibicao: categoriaOriginal?.ordemExibicao || 0,
+              kpiAlerta: categoriaOriginal?.kpiAlerta || false
+
 
             };
             tema.categorias.push(categoria);
@@ -158,6 +165,8 @@ export  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
                   id: kId.toString(),
                   title: kpiData.Title,
                   ids_persona: kpiData?.ids_persona?.map(i => i.Title) || [],
+                  ordemExibicao: kpiData?.ordemExibicao || 0,
+                  kpiAlerta: kpiData?.kpiAlerta || false,
 
                   ...kpiData,
                 });
@@ -166,7 +175,34 @@ export  const groupByHierarchy = (items: BaseDados[]): IDiretriz[] => {
         }
       }
     });
-    return Object.values(map);
+
+    const result = Object.values(map);
+
+    /* ===================== ORDENAÇÃO ===================== */
+    const sortByOrdem = (a: any, b: any) =>
+      (a.ordemExibicao ?? 9999) - (b.ordemExibicao ?? 9999);
+
+    result.forEach((diretriz) => {
+      // Ordena temas
+      diretriz.temas.sort(sortByOrdem);
+
+      diretriz.temas.forEach((tema) => {
+        // Ordena categorias
+        tema.categorias.sort(sortByOrdem);
+
+        tema.categorias.forEach((categoria) => {
+          // Ordena KPIs
+          categoria.kpis.sort(sortByOrdem);
+        });
+      });
+    });
+
+    // Ordena diretrizes
+    result.sort(sortByOrdem);
+
+    console.log("Resultado da hierarquia ordenada: ", result)
+
+    return result;
   };
 
 export const filterHierarchyByPersona = (

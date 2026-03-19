@@ -9,8 +9,9 @@ import {
   Star20Filled,
   Pin20Filled,
   Pin20Regular,
+  Warning20Filled
 } from "@fluentui/react-icons";
-import { Toggle } from "@fluentui/react";
+import { Toggle, TooltipHost } from "@fluentui/react";
 import { normalizeText } from "../../../utils";
 
 export interface IGenericNode {
@@ -190,9 +191,20 @@ const MultiLevelMenu: React.FC<IMultiLevelMenuProps> = ({
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {node.data?.kpiValidado && (
-                <CheckmarkCircle20Filled color="#2e7d32" />
-              )}
+              {/* 🔴 ALERTA TEM PRIORIDADE */}
+              {node.data?.kpiAlerta ? (
+                <TooltipHost content="KPI em atenção">
+                  <span style={{ display: "flex" }}>
+                    <Warning20Filled color="#f4b400" />
+                  </span>
+                </TooltipHost>
+              ) : node.data?.kpiValidado ? (
+                <TooltipHost content="KPI Higienizado">
+                  <span style={{ display: "flex" }}>
+                    <CheckmarkCircle20Filled color="#2e7d32" />
+                  </span>
+                </TooltipHost>
+              ) : null}
 
               {onPressStarItemGroup &&
                 hasChildren &&

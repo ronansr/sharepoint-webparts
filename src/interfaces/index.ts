@@ -3,6 +3,9 @@ interface IKpi {
   title: string;
   [key: string]: any;
   ids_persona?: any[];
+  ordemExibicao?: number;
+  kpiAlerta?: boolean;
+
 
 }
 interface ICategoria {
@@ -11,6 +14,9 @@ interface ICategoria {
   kpis: IKpi[];
   link?: any;
   ids_persona?: string[];
+  ordemExibicao?: number;
+  kpiAlerta?: boolean;
+  
 }
 interface ITema {
   id: string;
@@ -18,6 +24,9 @@ interface ITema {
   descricao?: string;
   categorias: ICategoria[];
   ids_persona?: string[];
+  ordemExibicao?: number;
+  kpiAlerta?: boolean;
+
 
 }
 interface IDiretriz {
@@ -27,4 +36,7 @@ interface IDiretriz {
   temas: ITema[];
   ids_persona?: string[];
   extradata?: any;
+  ordemExibicao?: number;
+  kpiAlerta?: boolean;
+
 }
