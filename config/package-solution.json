@@ -2,7 +2,7 @@
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
     "name": "univesp-client-side-solution",
-    "id": "5b38ba68-d283-4d74-a815-7bb98bb9f4b3",
+    "id": "5b38ba68-d283-4d74-a815-7bb98bb9f445",
     "version": "1.0.0.4",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,

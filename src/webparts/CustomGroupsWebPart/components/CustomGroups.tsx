@@ -178,7 +178,7 @@ const CustomGroups: React.FC<ICustomGroupsProps> = ({
 
       setTimeout(() => {
         onClose?.();
-      }, 1500);
+      }, 2500);
 
     } catch (error) {
       console.error("Erro ao salvar lista", error);

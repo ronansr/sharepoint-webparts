@@ -233,6 +233,35 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
     }
   };
 
+    const removeFavorite = async (item: any) => {
+    try {
+      const currentUserEmail = context.pageContext.user.email;
+
+      const existingItems = await sp.web.lists
+        .getByTitle("UsuarioListas")
+        .items.select("Id", "idItem", "email")
+        .filter(`email eq '${currentUserEmail}' and idItem eq '${item.id}'`)();
+
+      if (existingItems.length === 0) {
+        console.log("Nenhum favorito encontrado para remover.");
+        return;
+      }
+
+      for (const fav of existingItems) {
+        await sp.web.lists
+          .getByTitle("UsuarioListas")
+          .items.getById(fav.Id)
+          .delete();
+
+        console.log(`Favorito removido: registro ${fav.Id}`);
+      }
+
+      await loadFavorites();
+    } catch (error) {
+      console.error("Erro ao remover favorito", error);
+    }
+  };
+
   /* ☑ Seleção */
   const toggleItem = (item: IBaseDadosItem): void => {
     const exists = selectedItems.some((x) => x.idItem === item.id0);
@@ -288,6 +317,7 @@ const GroupItemsSelector: React.FC<IGroupItemsSelectorProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!isFavorite) saveFavorite(item);
+                    else removeFavorite(item)
                   }}
                 />
 
